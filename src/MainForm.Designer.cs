@@ -39,17 +39,19 @@
             // 
             // StatusLabel
             // 
-            this.StatusLabel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.StatusLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.StatusLabel.Location = new System.Drawing.Point(13, 13);
             this.StatusLabel.Name = "StatusLabel";
-            this.StatusLabel.Size = new System.Drawing.Size(445, 52);
+            this.StatusLabel.Size = new System.Drawing.Size(445, 105);
             this.StatusLabel.TabIndex = 0;
             this.StatusLabel.Text = "Checking for git";
             // 
             // LoadProjectButton
             // 
-            this.LoadProjectButton.Location = new System.Drawing.Point(16, 68);
+            this.LoadProjectButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.LoadProjectButton.Location = new System.Drawing.Point(16, 121);
             this.LoadProjectButton.Name = "LoadProjectButton";
             this.LoadProjectButton.Size = new System.Drawing.Size(136, 23);
             this.LoadProjectButton.TabIndex = 1;
@@ -65,20 +67,21 @@
             // 
             // BranchSelectMenu
             // 
-            this.BranchSelectMenu.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.BranchSelectMenu.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.BranchSelectMenu.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.BranchSelectMenu.Enabled = false;
             this.BranchSelectMenu.FormattingEnabled = true;
-            this.BranchSelectMenu.Location = new System.Drawing.Point(158, 104);
+            this.BranchSelectMenu.Location = new System.Drawing.Point(158, 157);
             this.BranchSelectMenu.Name = "BranchSelectMenu";
             this.BranchSelectMenu.Size = new System.Drawing.Size(300, 21);
             this.BranchSelectMenu.TabIndex = 2;
             // 
             // StartReviewButton
             // 
+            this.StartReviewButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.StartReviewButton.Enabled = false;
-            this.StartReviewButton.Location = new System.Drawing.Point(16, 103);
+            this.StartReviewButton.Location = new System.Drawing.Point(16, 156);
             this.StartReviewButton.Name = "StartReviewButton";
             this.StartReviewButton.Size = new System.Drawing.Size(136, 23);
             this.StartReviewButton.TabIndex = 3;
@@ -88,8 +91,9 @@
             // 
             // EndReviewButton
             // 
+            this.EndReviewButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.EndReviewButton.Enabled = false;
-            this.EndReviewButton.Location = new System.Drawing.Point(16, 132);
+            this.EndReviewButton.Location = new System.Drawing.Point(16, 185);
             this.EndReviewButton.Name = "EndReviewButton";
             this.EndReviewButton.Size = new System.Drawing.Size(136, 23);
             this.EndReviewButton.TabIndex = 4;
@@ -99,9 +103,9 @@
             // 
             // ResetStateButton
             // 
-            this.ResetStateButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.ResetStateButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.ResetStateButton.Enabled = false;
-            this.ResetStateButton.Location = new System.Drawing.Point(322, 68);
+            this.ResetStateButton.Location = new System.Drawing.Point(322, 121);
             this.ResetStateButton.Name = "ResetStateButton";
             this.ResetStateButton.Size = new System.Drawing.Size(136, 23);
             this.ResetStateButton.TabIndex = 5;
@@ -113,7 +117,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(470, 168);
+            this.ClientSize = new System.Drawing.Size(470, 221);
             this.Controls.Add(this.ResetStateButton);
             this.Controls.Add(this.EndReviewButton);
             this.Controls.Add(this.StartReviewButton);

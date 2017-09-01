@@ -1,4 +1,6 @@
-﻿using System.Windows.Forms;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace LittleReviewer
 {
@@ -46,7 +48,15 @@ namespace LittleReviewer
             var inMerge = git.HasMergeInProgress(BaseDirectory, out mergeName);
             if (inMerge)
             {
-                State_InMerge(mergeName);
+                if (mergeName.Contains("# Conflicts:")) State_MergeConflicts(mergeName);
+                else State_InMerge(mergeName);
+                return;
+            }
+
+            var changedFiles = git.GetUncommittedChangedFiles(BaseDirectory);
+            if (changedFiles.Any())
+            {
+                State_UnsavedChanges(changedFiles);
                 return;
             }
 
@@ -58,13 +68,21 @@ namespace LittleReviewer
                 return;
             }
 
-            BranchSelectMenu.Items.Clear();
-            BranchSelectMenu.Items.Add(PickABranchMessage);
-            // ReSharper disable once CoVariantArrayConversion
-            BranchSelectMenu.Items.AddRange(branchesAvailable.ToArray());
-            BranchSelectMenu.SelectedIndex = 0;
+            WriteBranchesToDropDown(branchesAvailable);
             State_ReadyToReview();
 
+        }
+
+        private void State_UnsavedChanges(List<string> changedFiles)
+        {
+            DisableControls();
+            LoadProjectButton.Enabled = true;
+            ResetStateButton.Enabled = true;
+
+            var fileList = string.Join("\r\n* ", changedFiles);
+            SetStatus("Project at '" + BaseDirectory + "' has unsaved local changes. This prevents reviews being started.\r\n" +
+                      "Press 'Reset Changes' to undo changes. Changes to these files will be lost:\r\n* " + 
+                      fileList);
         }
 
         private void State_ReadyToReview()
@@ -102,7 +120,7 @@ namespace LittleReviewer
             DisableControls();
             LoadProjectButton.Enabled = true;
             ResetStateButton.Enabled = true;
-            SetStatus("Project at '" + BaseDirectory + "' is not ready for reviews. Press 'Reset State' to undo changes. Changes will be lost.");
+            SetStatus("Project at '" + BaseDirectory + "' is not ready for reviews. Press 'Reset Changes' to undo changes. Changes will be lost.");
         }
 
         private void State_NotARepo(string selectedPath)
@@ -112,6 +130,13 @@ namespace LittleReviewer
             SetStatus("Directory '" + selectedPath + "' is not a git repo.");
         }
 
+        private void State_MergeConflicts(string moreInfo)
+        {
+            DisableControls();
+            LoadProjectButton.Enabled = true;
+            EndReviewButton.Enabled = true;
+            SetStatus("This branch is in conflict with 'master'. Please alert the developers and have them resubmit.\r\n" + moreInfo);
+        }
 
 
         private void SetStatus(string msg)
@@ -119,7 +144,16 @@ namespace LittleReviewer
             StatusLabel.Text = msg;
             Refresh();
         }
+        
 
+        private void WriteBranchesToDropDown(List<string> branchesAvailable)
+        {
+            BranchSelectMenu.Items.Clear();
+            BranchSelectMenu.Items.Add(PickABranchMessage);
+            // ReSharper disable once CoVariantArrayConversion
+            BranchSelectMenu.Items.AddRange(branchesAvailable.ToArray());
+            BranchSelectMenu.SelectedIndex = 0;
+        }
 
         private void DisableControls()
         {
@@ -161,8 +195,20 @@ namespace LittleReviewer
             // merge branch into wc
             DisableControls();
             SetStatus("Working...");
-            SetStatus(git.MergeBranchIntoWorkingCopy(BaseDirectory, BranchSelectMenu.Text));
-            SetupProject(BaseDirectory);
+
+            string status;
+            var ok = git.TryMergeBranchIntoWorkingCopy(BaseDirectory, BranchSelectMenu.Text, out status);
+
+            if (ok)
+            {
+                SetStatus(status);
+                SetupProject(BaseDirectory);
+            }
+            else
+            {
+                git.HasMergeInProgress(BaseDirectory, out status);
+                State_MergeConflicts(status);
+            }
         }
 
         private void EndReviewButton_Click(object sender, System.EventArgs e)
@@ -174,9 +220,6 @@ namespace LittleReviewer
             SetupProject(BaseDirectory);
         }
 
-        private void MainForm_Load(object sender, System.EventArgs e)
-        {
-
-        }
+        private void MainForm_Load(object sender, System.EventArgs e) { }
     }
 }

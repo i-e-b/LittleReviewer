@@ -3,9 +3,6 @@ A tiny git front-end for reviewers (not developers)
 
 This tool is designed to give non-developers a chance to test TFS pull requests before they are merged. It works by doing workspace merges into master, with no commit.
 
-# TODO:
-1. Handle merge conflicts with a message (review tool should alert the user that the P.R. is stale, and the developers should be notified)
-
 ## Details
 
 At the start of a review, master is checked-out, and the selected branch is merged in, with the options `--no-ff` and `--no-commit`.

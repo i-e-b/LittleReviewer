@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -17,6 +18,7 @@ namespace LittleReviewer
         public const string ResetCurrent = "reset --hard HEAD";
         public const string CurrentBranch = "rev-parse --abbrev-ref HEAD";
         public const string BranchesNotMerged = "branch -r --no-merged master";
+        public const string ListUncommittedChanges = "diff-index --name-only HEAD";
 
         public Git(string gitExePath)
         {
@@ -49,7 +51,7 @@ namespace LittleReviewer
             }
         }
 
-        private static List<string> ExecuteAndReadAllLines(string exe, string args, string dir = null)
+        private static string ExecuteAndReadStatus(string exe, string args, string dir = null)
         {
             using (var p = Process.Start(new ProcessStartInfo
             {
@@ -57,7 +59,7 @@ namespace LittleReviewer
                 Arguments = args,
                 UseShellExecute = false,
                 WorkingDirectory = dir ?? Directory.GetCurrentDirectory(),
-                RedirectStandardOutput = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
                 CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden
             }))
             {
@@ -65,7 +67,31 @@ namespace LittleReviewer
                 if (!p.WaitForExit(30000)) return null;
                 if (p.ExitCode != 0) return null;
 
-                return p.StandardOutput.ReadToEnd().Split('\r','\n').Where(l=> ! string.IsNullOrWhiteSpace(l)).Select(l=>l.Trim()).ToList();
+                return p.StandardError.ReadLine() + p.StandardOutput.ReadLine();
+            }
+        }
+
+        private static List<string> ExecuteAndReadAllLines(string exe, string args, string dir, bool filterExitCode = true)
+        {
+            using (var p = Process.Start(new ProcessStartInfo
+            {
+                FileName = exe,
+                Arguments = args,
+                UseShellExecute = false,
+                WorkingDirectory = dir ?? Directory.GetCurrentDirectory(),
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden
+            }))
+            {
+                if (p == null) return null;
+                if (!p.WaitForExit(30000)) return null;
+                if (filterExitCode && p.ExitCode != 0) return null;
+
+                var rawStdout = p.StandardOutput.ReadToEnd();
+                var rawStderr = p.StandardError.ReadToEnd();
+                string src = (rawStderr.Length > rawStdout.Length) ? (rawStderr) : (rawStdout);
+
+                return src.Split('\r','\n').Where(l=> ! string.IsNullOrWhiteSpace(l)).Select(l=>l.Trim()).ToList();
             }
         }
 
@@ -108,10 +134,16 @@ namespace LittleReviewer
             return true;
         }
 
-        public string MergeBranchIntoWorkingCopy(string repo, string branchName)
+        public List<string> GetUncommittedChangedFiles(string repo)
+        {
+            return ExecuteAndReadAllLines(_gitExePath, ListUncommittedChanges, repo, filterExitCode: false);
+        }
+
+        public bool TryMergeBranchIntoWorkingCopy(string repo, string branchName, out string status)
         {
             var cmd = string.Format(MergeToWorkingCopy, branchName, "Code review for " + branchName.Replace("origin/",""));
-            return ExecuteAndReadLine(_gitExePath, cmd, repo);
+            status = ExecuteAndReadStatus(_gitExePath, cmd, repo);
+            return status != null;
         }
     }
 }
