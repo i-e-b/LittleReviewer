@@ -28,13 +28,16 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.StatusLabel = new System.Windows.Forms.Label();
             this.LoadProjectButton = new System.Windows.Forms.Button();
             this.BrowseForProjectDlog = new System.Windows.Forms.FolderBrowserDialog();
             this.BranchSelectMenu = new System.Windows.Forms.ComboBox();
             this.StartReviewButton = new System.Windows.Forms.Button();
             this.EndReviewButton = new System.Windows.Forms.Button();
-            this.ResetStateButton = new System.Windows.Forms.Button();
+            this.CleanupReviewButton = new System.Windows.Forms.Button();
+            this.CopyProgress = new System.Windows.Forms.ProgressBar();
+            this.ProgressTimer = new System.Windows.Forms.Timer(this.components);
             this.SuspendLayout();
             // 
             // StatusLabel
@@ -42,20 +45,20 @@
             this.StatusLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.StatusLabel.Location = new System.Drawing.Point(13, 13);
+            this.StatusLabel.Location = new System.Drawing.Point(13, 38);
             this.StatusLabel.Name = "StatusLabel";
-            this.StatusLabel.Size = new System.Drawing.Size(445, 105);
+            this.StatusLabel.Size = new System.Drawing.Size(445, 76);
             this.StatusLabel.TabIndex = 0;
-            this.StatusLabel.Text = "Checking for git";
+            this.StatusLabel.Text = "Checking shared folders...";
             // 
             // LoadProjectButton
             // 
             this.LoadProjectButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.LoadProjectButton.Location = new System.Drawing.Point(16, 121);
             this.LoadProjectButton.Name = "LoadProjectButton";
-            this.LoadProjectButton.Size = new System.Drawing.Size(136, 23);
+            this.LoadProjectButton.Size = new System.Drawing.Size(202, 23);
             this.LoadProjectButton.TabIndex = 1;
-            this.LoadProjectButton.Text = "&Load Project...";
+            this.LoadProjectButton.Text = "Select Local Review Folder...";
             this.LoadProjectButton.UseVisualStyleBackColor = true;
             this.LoadProjectButton.Click += new System.EventHandler(this.LoadProjectButton_Click);
             // 
@@ -76,6 +79,7 @@
             this.BranchSelectMenu.Name = "BranchSelectMenu";
             this.BranchSelectMenu.Size = new System.Drawing.Size(300, 21);
             this.BranchSelectMenu.TabIndex = 2;
+            this.BranchSelectMenu.SelectedIndexChanged += new System.EventHandler(this.BranchSelectMenu_SelectedIndexChanged);
             // 
             // StartReviewButton
             // 
@@ -101,24 +105,40 @@
             this.EndReviewButton.UseVisualStyleBackColor = true;
             this.EndReviewButton.Click += new System.EventHandler(this.EndReviewButton_Click);
             // 
-            // ResetStateButton
+            // CleanupReviewButton
             // 
-            this.ResetStateButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.ResetStateButton.Enabled = false;
-            this.ResetStateButton.Location = new System.Drawing.Point(322, 121);
-            this.ResetStateButton.Name = "ResetStateButton";
-            this.ResetStateButton.Size = new System.Drawing.Size(136, 23);
-            this.ResetStateButton.TabIndex = 5;
-            this.ResetStateButton.Text = "Reset Changes";
-            this.ResetStateButton.UseVisualStyleBackColor = true;
-            this.ResetStateButton.Click += new System.EventHandler(this.ResetStateButton_Click);
+            this.CleanupReviewButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.CleanupReviewButton.Enabled = false;
+            this.CleanupReviewButton.Location = new System.Drawing.Point(322, 121);
+            this.CleanupReviewButton.Name = "CleanupReviewButton";
+            this.CleanupReviewButton.Size = new System.Drawing.Size(136, 23);
+            this.CleanupReviewButton.TabIndex = 5;
+            this.CleanupReviewButton.Text = "Clean-up Review";
+            this.CleanupReviewButton.UseVisualStyleBackColor = true;
+            this.CleanupReviewButton.Click += new System.EventHandler(this.CleanupReviewButton_Click);
+            // 
+            // CopyProgress
+            // 
+            this.CopyProgress.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.CopyProgress.Location = new System.Drawing.Point(16, 12);
+            this.CopyProgress.Name = "CopyProgress";
+            this.CopyProgress.Size = new System.Drawing.Size(430, 23);
+            this.CopyProgress.TabIndex = 6;
+            // 
+            // ProgressTimer
+            // 
+            this.ProgressTimer.Enabled = true;
+            this.ProgressTimer.Interval = 1000;
+            this.ProgressTimer.Tick += new System.EventHandler(this.ProgressTimer_Tick);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(470, 221);
-            this.Controls.Add(this.ResetStateButton);
+            this.Controls.Add(this.CopyProgress);
+            this.Controls.Add(this.CleanupReviewButton);
             this.Controls.Add(this.EndReviewButton);
             this.Controls.Add(this.StartReviewButton);
             this.Controls.Add(this.BranchSelectMenu);
@@ -142,7 +162,9 @@
         private System.Windows.Forms.ComboBox BranchSelectMenu;
         private System.Windows.Forms.Button StartReviewButton;
         private System.Windows.Forms.Button EndReviewButton;
-        private System.Windows.Forms.Button ResetStateButton;
+        private System.Windows.Forms.Button CleanupReviewButton;
+        private System.Windows.Forms.ProgressBar CopyProgress;
+        private System.Windows.Forms.Timer ProgressTimer;
     }
 }
 

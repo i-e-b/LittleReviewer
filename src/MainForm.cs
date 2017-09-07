@@ -1,88 +1,49 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace LittleReviewer
 {
     public partial class MainForm : Form
     {
-        private const string PickABranchMessage = "- pick a branch -";
+        private const string PickPullRequestMessage = "- pick a pull request ID -";
 
-        private readonly Git git;
         private string BaseDirectory;
 
         public MainForm()
         {
             InitializeComponent();
-            var gitPath = Git.FindGitExe();
 
-            if (gitPath == null)
+            if (NativeIO.Exists(Paths.Masters))
             {
-                State_CantFindGit();
-                return;
+                SetStatus("Using masters at " + Paths.MastersRoot + ".");
             }
-
-            git = new Git(gitPath);
-            SetStatus("Using git at " + gitPath + ".");
+            else
+            {
+                State_CantFindShare();
+            }
         }
 
         private void SetupProject(string selectedPath)
         {
             SetStatus("Working...");
-            var ok = git.TryReadRepo(selectedPath, out BaseDirectory);
-            if (!ok)
-            {
-                State_NotARepo(selectedPath);
-                return;
-            }
+            CopyProgress.Minimum = 0;
+            CopyProgress.Maximum = 100;
+            CopyProgress.Value = 0;
 
+            BaseDirectory = selectedPath;
 
-            var currentBranch = git.GetBranchName(BaseDirectory);
-            if (currentBranch != "master")
-            {
-                State_NotInMaster();
-                return;
-            }
-
-            string mergeName;
-            var inMerge = git.HasMergeInProgress(BaseDirectory, out mergeName);
-            if (inMerge)
-            {
-                if (mergeName.Contains("# Conflicts:")) State_MergeConflicts(mergeName);
-                else State_InMerge(mergeName);
-                return;
-            }
-
-            var changedFiles = git.GetUncommittedChangedFiles(BaseDirectory);
-            if (changedFiles.Any())
-            {
-                State_UnsavedChanges(changedFiles);
-                return;
-            }
-
-            git.FetchAll(BaseDirectory);
-            var branchesAvailable = git.GetUnmergedBranches(BaseDirectory);
-            if (branchesAvailable.Count < 1)
+            var prs = NativeIO.EnumerateFiles(Paths.PullRequestRoot, ResultType.DirectoriesOnly).Select(f=>f.Name).ToList();
+            if (prs.Count < 1)
             {
                 State_NothingToMerge();
                 return;
             }
 
-            WriteBranchesToDropDown(branchesAvailable);
+            WriteBranchesToDropDown(prs);
             State_ReadyToReview();
-
-        }
-
-        private void State_UnsavedChanges(List<string> changedFiles)
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            ResetStateButton.Enabled = true;
-
-            var fileList = string.Join("\r\n* ", changedFiles);
-            SetStatus("Project at '" + BaseDirectory + "' has unsaved local changes. This prevents reviews being started.\r\n" +
-                      "Press 'Reset Changes' to undo changes. Changes to these files will be lost:\r\n* " + 
-                      fileList);
         }
 
         private void State_ReadyToReview()
@@ -90,54 +51,23 @@ namespace LittleReviewer
             DisableControls();
             LoadProjectButton.Enabled = true;
             StartReviewButton.Enabled = true;
+            EndReviewButton.Enabled = true;
             BranchSelectMenu.Enabled = true;
             SetStatus("Project at " + BaseDirectory +" is ready");
-        }
-
-        private void State_InMerge(string mergeName)
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            EndReviewButton.Enabled = true;
-            SetStatus("A review has been started in this project: "+mergeName+"\r\nUse Visual Studio to rebuild before testing.");
         }
 
         private void State_NothingToMerge()
         {
             DisableControls();
             LoadProjectButton.Enabled = true;
-            SetStatus("There are no unmerged branches to review.");
+            SetStatus("There are no pull request builds ready to review.");
         }
 
-        private void State_CantFindGit()
+        private void State_CantFindShare()
         {
             DisableControls();
-            SetStatus("No 'git.exe' was found. Please check it is installed and on the path");
+            SetStatus("Could not access the build output. Expecting it at '" + Paths.MastersRoot + "'.\r\nPlease check with the dev team.");
         }
-
-        private void State_NotInMaster()
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            ResetStateButton.Enabled = true;
-            SetStatus("Project at '" + BaseDirectory + "' is not ready for reviews. Press 'Reset Changes' to undo changes. Changes will be lost.");
-        }
-
-        private void State_NotARepo(string selectedPath)
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            SetStatus("Directory '" + selectedPath + "' is not a git repo.");
-        }
-
-        private void State_MergeConflicts(string moreInfo)
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            EndReviewButton.Enabled = true;
-            SetStatus("This branch is in conflict with 'master'. Please alert the developers and have them resubmit.\r\n" + moreInfo);
-        }
-
 
         private void SetStatus(string msg)
         {
@@ -149,7 +79,7 @@ namespace LittleReviewer
         private void WriteBranchesToDropDown(List<string> branchesAvailable)
         {
             BranchSelectMenu.Items.Clear();
-            BranchSelectMenu.Items.Add(PickABranchMessage);
+            BranchSelectMenu.Items.Add(PickPullRequestMessage);
             // ReSharper disable once CoVariantArrayConversion
             BranchSelectMenu.Items.AddRange(branchesAvailable.ToArray());
             BranchSelectMenu.SelectedIndex = 0;
@@ -158,7 +88,7 @@ namespace LittleReviewer
         private void DisableControls()
         {
             LoadProjectButton.Enabled = false;
-            ResetStateButton.Enabled = false;
+            CleanupReviewButton.Enabled = false;
             StartReviewButton.Enabled = false;
             EndReviewButton.Enabled = false;
             BranchSelectMenu.Enabled = false;
@@ -176,11 +106,10 @@ namespace LittleReviewer
             }
         }
 
-        private void ResetStateButton_Click(object sender, System.EventArgs e)
+        private void CleanupReviewButton_Click(object sender, System.EventArgs e)
         {
-            // reset head, checkout master, fetch, reset to origin
-            DisableControls();
-            SetStatus(git.ResetRepoToOriginMaster(BaseDirectory));
+            // This should delete the pull request folder
+            SetStatus("NOT YET IMPLEMENTED");
             SetupProject(BaseDirectory);
         }
 
@@ -191,6 +120,7 @@ namespace LittleReviewer
                 SetStatus("Pick a branch to review");
                 return;
             }
+            /*
 
             // merge branch into wc
             DisableControls();
@@ -208,18 +138,114 @@ namespace LittleReviewer
             {
                 git.HasMergeInProgress(BaseDirectory, out status);
                 State_MergeConflicts(status);
-            }
+            }*/
+
+            DisableControls();
+            SetStatus("Working...");
+            CopyMastersToLocal();
+            CopyPR(BranchSelectMenu.Text);
         }
+
+        private void CopyPR(string folderName)
+        {
+
+        }
+
+        private void CopyMastersToLocal()
+        {
+            AsyncCopy(source: Paths.MastersRoot, dest: BaseDirectory);
+        }
+
 
         private void EndReviewButton_Click(object sender, System.EventArgs e)
         {
-            // checkout master, fetch, reset to origin
+            // The plan: whichever product we copied across, restore that from masters
+            // at the moment, we do the lazy thing of copying everything back
             DisableControls();
             SetStatus("Working...");
-            SetStatus(git.ResetRepoToOriginMaster(BaseDirectory));
+            CopyMastersToLocal();
             SetupProject(BaseDirectory);
         }
 
         private void MainForm_Load(object sender, System.EventArgs e) { }
+
+        private void BranchSelectMenu_SelectedIndexChanged(object sender, System.EventArgs e)
+        {
+            CleanupReviewButton.Enabled = BranchSelectMenu.SelectedIndex > 0;
+        }
+        
+        private volatile int ready = 0;
+        private volatile int sent = 0;
+
+        private void AsyncCopy(string source, string dest)
+        {
+            /* Plan:
+               - Flag for when scanning is done
+               - Queue of files to be copied
+
+               - spin up a new thread (a) to recurse over the source. It will add files to the queue then flip the flag when done.
+               - spin up a new thread (b) that will copy the files until both queue is empty and flag is flipped
+            */
+
+            var _lock = new object();
+            var fileSubpaths = new Queue<FileDetail>();
+            var enumComplete = false;
+
+            new Thread(() => // read files
+            {
+                var list = NativeIO.EnumerateFiles(source, ResultType.FilesOnly, "*", SearchOption.AllDirectories);
+                foreach (var file in list)
+                    lock (_lock)
+                    {
+                        fileSubpaths.Enqueue(file);
+                        ready++;
+                    }
+                enumComplete = true;
+            }).Start();
+
+            
+            new Thread(() => // write files
+            {
+                bool hasItems = true;
+                while (!enumComplete || hasItems)
+                {
+                    FileDetail file;
+                    lock (_lock)
+                    {
+                        if (fileSubpaths.Count < 1)
+                        {
+                            hasItems = false;
+                            continue;
+                        }
+                        hasItems = true;
+                        file = fileSubpaths.Dequeue();
+                    }
+
+                    var target = file.PathInfo.Reroot(source, dest);
+                    NativeIO.CreateDirectory(target.Parent, true);
+                    NativeIO.CopyFile(file.PathInfo, target, true);
+                    sent++;
+                }
+                ready = 0; // mark the process done
+            }).Start();
+        }
+
+        private void ProgressTimer_Tick(object sender, System.EventArgs e)
+        {
+            if (ready < 1)
+            {
+                if (sent > 0)
+                {
+                    SetStatus("Copy complete");
+                    sent = 0;
+                }
+                State_ReadyToReview();
+                CopyProgress.Value = 0;
+                return;
+            }
+
+            CopyProgress.Value = (int)((sent / (double) ready) * 100);
+            SetStatus(sent + " of " + ready);
+        }
     }
 }
