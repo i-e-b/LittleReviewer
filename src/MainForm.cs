@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using System.ServiceProcess;
 using System.Windows.Forms;
 
 namespace LittleReviewer
@@ -9,8 +10,9 @@ namespace LittleReviewer
     public partial class MainForm : Form
     {
         private const string PickPullRequestMessage = "- pick a pull request ID -";
-
+        private readonly List<string> AffectedProducts = new List<string>();
         private string BaseDirectory;
+        private string CopyReason = "";
 
         public MainForm()
         {
@@ -28,6 +30,13 @@ namespace LittleReviewer
 
         private void SetupProject(string selectedPath)
         {
+
+            if (new PathInfo(selectedPath).IsRoot)
+            {
+                Status_SelectedRoot();
+                return;
+            }
+
             SetStatus("Working...");
             CopyProgress.Minimum = 0;
             CopyProgress.Maximum = 100;
@@ -62,11 +71,72 @@ namespace LittleReviewer
             LoadProjectButton.Enabled = true;
             SetStatus("There are no pull request builds ready to review.");
         }
+        
+        private void Status_SelectedRoot()
+        {
+            DisableControls();
+            LoadProjectButton.Enabled = true;
+            SetStatus("Don't use the drive root for reviewing. Please create a folder to contain review artifacts.");
+        }
 
         private void State_CantFindShare()
         {
             DisableControls();
             SetStatus("Could not access the build output. Expecting it at '" + Paths.MastersRoot + "'.\r\nPlease check with the dev team.");
+        }
+
+        private void StopIIS()
+        {
+            SetStatus("Stopping IIS");
+
+            string serviceName = "W3SVC"; //W3SVC refers to IIS service
+            ServiceController service = new ServiceController(serviceName);
+            if (service.Status == ServiceControllerStatus.Running)
+            {
+                service.Stop();
+                service.WaitForStatus(ServiceControllerStatus.Stopped); // Wait till the service started and is running
+            }
+            SetStatus("IIS Stopped");
+        }
+
+        private void StartIIS()
+        {
+            SetStatus("Starting IIS");
+
+            string serviceName = "W3SVC"; //W3SVC refers to IIS service
+            ServiceController service = new ServiceController(serviceName);
+            if (service.Status == ServiceControllerStatus.Stopped)
+            {
+                service.Start();
+                service.WaitForStatus(ServiceControllerStatus.Running); // Wait till the service started and is running
+            }
+            SetStatus("IIS started");
+        }
+
+        private void CopyMastersAndPR(string folderName)
+        {
+            StopIIS();
+            var prDirectory = Path.Combine(Paths.PullRequestRoot, folderName, Paths.PrContainer);
+            // The PR drop folder is partly set by TFS. It should be configured to follow:
+            //  \\server\share\PullRequests\refs\pull\{ID OF PULL REQUEST}\merge\{FOLDER IN MASTERS TO OVERWRITE}\...contents...
+
+            AffectedProducts.Clear();
+            var toCopy = NativeIO.EnumerateFiles(prDirectory, ResultType.DirectoriesOnly).ToList();
+
+            AsyncFile.Copy(Paths.MastersRoot, BaseDirectory, () => {
+                foreach (var fileDetail in toCopy)
+                {
+                    var target = Path.Combine(BaseDirectory, fileDetail.Name);
+                    AsyncFile.Copy(fileDetail.FullName, target, null);
+                    AffectedProducts.Add(fileDetail.Name);
+                }
+            });
+        }
+
+        private void CopyMastersToLocal()
+        {
+            StopIIS();
+            AsyncFile.Copy(Paths.MastersRoot, BaseDirectory, null);
         }
 
         private void SetStatus(string msg)
@@ -75,7 +145,6 @@ namespace LittleReviewer
             Refresh();
         }
         
-
         private void WriteBranchesToDropDown(List<string> branchesAvailable)
         {
             BranchSelectMenu.Items.Clear();
@@ -108,8 +177,17 @@ namespace LittleReviewer
 
         private void CleanupReviewButton_Click(object sender, System.EventArgs e)
         {
+            if (BranchSelectMenu.SelectedIndex < 1)
+            {
+                SetStatus("Pick a pull request to delete");
+                return;
+            }
+
             // This should delete the pull request folder
-            SetStatus("NOT YET IMPLEMENTED");
+            SetStatus("Deleting Pull Request directory...");
+            //NativeIO.DeleteDirectory("", recursive:true);
+            var prDirectory = Path.Combine(Paths.PullRequestRoot, BranchSelectMenu.Text);
+            Directory.Delete(prDirectory, true);
             SetupProject(BaseDirectory);
         }
 
@@ -117,45 +195,15 @@ namespace LittleReviewer
         {
             if (BranchSelectMenu.SelectedIndex < 1)
             {
-                SetStatus("Pick a branch to review");
+                SetStatus("Pick a pull request to review");
                 return;
             }
-            /*
-
-            // merge branch into wc
-            DisableControls();
-            SetStatus("Working...");
-
-            string status;
-            var ok = git.TryMergeBranchIntoWorkingCopy(BaseDirectory, BranchSelectMenu.Text, out status);
-
-            if (ok)
-            {
-                SetStatus(status);
-                SetupProject(BaseDirectory);
-            }
-            else
-            {
-                git.HasMergeInProgress(BaseDirectory, out status);
-                State_MergeConflicts(status);
-            }*/
 
             DisableControls();
             SetStatus("Working...");
-            CopyMastersToLocal();
-            CopyPR(BranchSelectMenu.Text);
+            CopyReason = "Updating masters and copying Pull Request";
+            CopyMastersAndPR(BranchSelectMenu.Text);
         }
-
-        private void CopyPR(string folderName)
-        {
-
-        }
-
-        private void CopyMastersToLocal()
-        {
-            AsyncCopy(source: Paths.MastersRoot, dest: BaseDirectory);
-        }
-
 
         private void EndReviewButton_Click(object sender, System.EventArgs e)
         {
@@ -163,6 +211,7 @@ namespace LittleReviewer
             // at the moment, we do the lazy thing of copying everything back
             DisableControls();
             SetStatus("Working...");
+            CopyReason = "Resetting to most recent masters";
             CopyMastersToLocal();
             SetupProject(BaseDirectory);
         }
@@ -174,78 +223,24 @@ namespace LittleReviewer
             CleanupReviewButton.Enabled = BranchSelectMenu.SelectedIndex > 0;
         }
         
-        private volatile int ready = 0;
-        private volatile int sent = 0;
-
-        private void AsyncCopy(string source, string dest)
-        {
-            /* Plan:
-               - Flag for when scanning is done
-               - Queue of files to be copied
-
-               - spin up a new thread (a) to recurse over the source. It will add files to the queue then flip the flag when done.
-               - spin up a new thread (b) that will copy the files until both queue is empty and flag is flipped
-            */
-
-            var _lock = new object();
-            var fileSubpaths = new Queue<FileDetail>();
-            var enumComplete = false;
-
-            new Thread(() => // read files
-            {
-                var list = NativeIO.EnumerateFiles(source, ResultType.FilesOnly, "*", SearchOption.AllDirectories);
-                foreach (var file in list)
-                    lock (_lock)
-                    {
-                        fileSubpaths.Enqueue(file);
-                        ready++;
-                    }
-                enumComplete = true;
-            }).Start();
-
-            
-            new Thread(() => // write files
-            {
-                bool hasItems = true;
-                while (!enumComplete || hasItems)
-                {
-                    FileDetail file;
-                    lock (_lock)
-                    {
-                        if (fileSubpaths.Count < 1)
-                        {
-                            hasItems = false;
-                            continue;
-                        }
-                        hasItems = true;
-                        file = fileSubpaths.Dequeue();
-                    }
-
-                    var target = file.PathInfo.Reroot(source, dest);
-                    NativeIO.CreateDirectory(target.Parent, true);
-                    NativeIO.CopyFile(file.PathInfo, target, true);
-                    sent++;
-                }
-                ready = 0; // mark the process done
-            }).Start();
-        }
-
         private void ProgressTimer_Tick(object sender, System.EventArgs e)
         {
-            if (ready < 1)
+            if (AsyncFile.FilesQueued < 1)
             {
-                if (sent > 0)
+                if (AsyncFile.FilesCopied > 0)
                 {
-                    SetStatus("Copy complete");
-                    sent = 0;
+                    var list = string.Join("\r\n", AffectedProducts);
+                    SetStatus("Copy complete\r\n"+list);
+                    AsyncFile.ResetCounts();
+                    StartIIS();
+                    State_ReadyToReview();
                 }
-                State_ReadyToReview();
                 CopyProgress.Value = 0;
                 return;
             }
 
-            CopyProgress.Value = (int)((sent / (double) ready) * 100);
-            SetStatus(sent + " of " + ready);
+            CopyProgress.Value = Math.Min(100,(int)((AsyncFile.FilesCopied / (double) AsyncFile.FilesQueued) * 100));
+            SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
         }
     }
 }

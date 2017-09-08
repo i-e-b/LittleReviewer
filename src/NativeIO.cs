@@ -33,11 +33,6 @@ namespace LittleReviewer
         SeWmiguidObject = 0xb,
         SeRegistryWow6432Key = 0xc
     }
-    [Flags]
-    enum FileAttrFlags : uint {
-        INVALID_FILE_ATTRIBUTES = 0xffffffffu,
-        FILE_ATTRIBUTE_REPARSE_POINT = 0x0400u
-    }
 
     static class Win32SafeNativeMethods
     {
@@ -112,7 +107,13 @@ namespace LittleReviewer
         /// Gets Attributes of given path
         /// </summary>
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        internal static extern uint GetFileAttributes(string fullName);
+        internal static extern FileAttributes GetFileAttributes(string fullName);
+        
+        /// <summary>
+        /// Sets Attributes of given path
+        /// </summary>
+        [DllImport("kernel32.dll")]
+        internal static extern bool SetFileAttributes(string lpFileName, [MarshalAs(UnmanagedType.U4)] FileAttributes dwFileAttributes);
 
         /// <summary>
         /// Close Hnalde
@@ -120,6 +121,37 @@ namespace LittleReviewer
         [DllImport("kernel32.dll", SetLastError = false, CharSet = CharSet.Unicode)]
         internal static extern bool FindClose(SafeHandle fileHandle);
     }
+    
+    [Flags] public enum FileAttributes : uint
+    {
+        Readonly = 0x00000001,
+        Hidden = 0x00000002,
+        System = 0x00000004,
+        Directory = 0x00000010,
+        Archive = 0x00000020,
+        Device = 0x00000040,
+        Normal = 0x00000080,
+        Temporary = 0x00000100,
+        SparseFile = 0x00000200,
+        ReparsePoint = 0x00000400,
+        Compressed = 0x00000800,
+        Offline = 0x00001000,
+        NotContentIndexed = 0x00002000,
+        Encrypted = 0x00004000,
+        Write_Through = 0x80000000,
+        Overlapped = 0x40000000,
+        NoBuffering = 0x20000000,
+        RandomAccess = 0x10000000,
+        SequentialScan = 0x08000000,
+        DeleteOnClose = 0x04000000,
+        BackupSemantics = 0x02000000,
+        PosixSemantics = 0x01000000,
+        OpenReparsePoint = 0x00200000,
+        OpenNoRecall = 0x00100000,
+        FirstPipeInstance = 0x00080000,
+        InvalidFileAttributes =  0xffffffffu
+    }
+
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     [BestFitMapping(false)]
@@ -1115,9 +1147,9 @@ namespace LittleReviewer
         /// <param name="pathInfo">Path to check</param>
         public static Boolean Exists(PathInfo pathInfo)
         {
-            var attributes = (FileAttrFlags)Win32SafeNativeMethods.GetFileAttributes(pathInfo.FullNameUnc);
+            var attributes = (FileAttributes)Win32SafeNativeMethods.GetFileAttributes(pathInfo.FullNameUnc);
 
-            return !Equals(attributes, FileAttrFlags.INVALID_FILE_ATTRIBUTES);
+            return !Equals(attributes, FileAttributes.InvalidFileAttributes);
         }
 
         /// <summary>
@@ -1125,7 +1157,19 @@ namespace LittleReviewer
         /// </summary>
         public static Boolean IsSymLink(PathInfo pathInfo)
         {
-            return (Win32SafeNativeMethods.GetFileAttributes(pathInfo.FullNameUnc) & (uint)FileAttrFlags.FILE_ATTRIBUTE_REPARSE_POINT) == (uint)FileAttrFlags.FILE_ATTRIBUTE_REPARSE_POINT;
+            return ((uint)Win32SafeNativeMethods.GetFileAttributes(pathInfo.FullNameUnc) & (uint)FileAttributes.ReparsePoint) == (uint)FileAttributes.ReparsePoint;
+        }
+
+        /// <summary>
+        /// Sets the 'read-only' flag of a file to false
+        /// </summary>
+        /// <param name="pathInfo"></param>
+        public static void EnsureNotReadonly(PathInfo pathInfo)
+        {
+            var existing = Win32SafeNativeMethods.GetFileAttributes(pathInfo.FullNameUnc);
+            if (existing == FileAttributes.InvalidFileAttributes) return;
+            var updated = existing & (~FileAttributes.Readonly);
+            Win32SafeNativeMethods.SetFileAttributes(pathInfo.FullNameUnc, updated);
         }
 
         /// <summary>
@@ -1303,6 +1347,7 @@ namespace LittleReviewer
         {
             bool failOnExists = !overwrite;
 
+            EnsureNotReadonly(targetFilePath);
             bool result = Win32SafeNativeMethods.CopyFile(sourceFilePath.FullNameUnc, targetFilePath.FullNameUnc, failOnExists);
             if (!result)
             {
@@ -1400,7 +1445,7 @@ namespace LittleReviewer
             public static bool IsSymLink(Win32FindData win32FindData)
             {
                 return
-                    ((uint)win32FindData.dwFileAttributes & (uint)FileAttrFlags.FILE_ATTRIBUTE_REPARSE_POINT) == (uint)FileAttrFlags.FILE_ATTRIBUTE_REPARSE_POINT
+                    ((uint)win32FindData.dwFileAttributes & (uint)FileAttributes.ReparsePoint) == (uint)FileAttributes.ReparsePoint
                     &&
                     ((uint)win32FindData.dwReserved0 & SymLinkTag) == SymLinkTag;
             }
