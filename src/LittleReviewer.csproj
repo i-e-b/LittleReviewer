@@ -38,9 +38,11 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsyncFile.cs" />
@@ -52,10 +54,19 @@
     </Compile>
     <Compile Include="NativeIO.cs" />
     <Compile Include="Paths.cs" />
+    <Compile Include="PathsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="PathsForm.Designer.cs">
+      <DependentUpon>PathsForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PathsForm.resx">
+      <DependentUpon>PathsForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

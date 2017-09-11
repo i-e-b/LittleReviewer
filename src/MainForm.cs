@@ -242,5 +242,10 @@ namespace LittleReviewer
             CopyProgress.Value = Math.Min(100,(int)((AsyncFile.FilesCopied / (double) AsyncFile.FilesQueued) * 100));
             SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
         }
+
+        private void SettingButton_Click(object sender, EventArgs e)
+        {
+            new PathsForm().ShowDialog();
+        }
     }
 }

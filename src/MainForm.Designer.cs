@@ -38,6 +38,7 @@
             this.CleanupReviewButton = new System.Windows.Forms.Button();
             this.CopyProgress = new System.Windows.Forms.ProgressBar();
             this.ProgressTimer = new System.Windows.Forms.Timer(this.components);
+            this.SettingButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // StatusLabel
@@ -132,11 +133,24 @@
             this.ProgressTimer.Interval = 1000;
             this.ProgressTimer.Tick += new System.EventHandler(this.ProgressTimer_Tick);
             // 
+            // SettingButton
+            // 
+            this.SettingButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.SettingButton.Location = new System.Drawing.Point(428, 185);
+            this.SettingButton.Name = "SettingButton";
+            this.SettingButton.Size = new System.Drawing.Size(30, 24);
+            this.SettingButton.TabIndex = 7;
+            this.SettingButton.Text = ". . .";
+            this.SettingButton.TextAlign = System.Drawing.ContentAlignment.TopCenter;
+            this.SettingButton.UseVisualStyleBackColor = true;
+            this.SettingButton.Click += new System.EventHandler(this.SettingButton_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(470, 221);
+            this.Controls.Add(this.SettingButton);
             this.Controls.Add(this.CopyProgress);
             this.Controls.Add(this.CleanupReviewButton);
             this.Controls.Add(this.EndReviewButton);
@@ -165,6 +179,7 @@
         private System.Windows.Forms.Button CleanupReviewButton;
         private System.Windows.Forms.ProgressBar CopyProgress;
         private System.Windows.Forms.Timer ProgressTimer;
+        private System.Windows.Forms.Button SettingButton;
     }
 }
 

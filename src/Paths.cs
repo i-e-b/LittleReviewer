@@ -2,9 +2,9 @@
 {
     public class Paths
     {
-        public const string PullRequestRoot = @"\\172.16.0.34\NuGet$\PullRequests\refs\pull";
-        public const string PrContainer = @"merge";
-        public const string MastersRoot = @"\\172.16.0.34\NuGet$\Masters";
+        public static string PullRequestRoot = @"\\web020.testing.gocompare.local\wwwroot\Reviews\PullRequests\refs\pull";
+        public static string PrContainer = @"merge";
+        public static string MastersRoot = @"\\web020.testing.gocompare.local\wwwroot\Reviews\Masters";
 
         public static PathInfo Masters {
             get { return new PathInfo(MastersRoot); }
