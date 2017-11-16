@@ -160,7 +160,6 @@
             this.Controls.Add(this.LoadProjectButton);
             this.Controls.Add(this.StatusLabel);
             this.MaximizeBox = false;
-            this.MinimizeBox = false;
             this.MinimumSize = new System.Drawing.Size(486, 207);
             this.Name = "MainForm";
             this.Text = "Review Tool";
