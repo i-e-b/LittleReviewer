@@ -79,6 +79,7 @@
             this.BranchSelectMenu.Location = new System.Drawing.Point(158, 157);
             this.BranchSelectMenu.Name = "BranchSelectMenu";
             this.BranchSelectMenu.Size = new System.Drawing.Size(300, 21);
+            this.BranchSelectMenu.Sorted = true;
             this.BranchSelectMenu.TabIndex = 2;
             this.BranchSelectMenu.SelectedIndexChanged += new System.EventHandler(this.BranchSelectMenu_SelectedIndexChanged);
             // 
