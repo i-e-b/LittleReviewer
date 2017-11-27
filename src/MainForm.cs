@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.ServiceProcess;
 using System.Windows.Forms;
+using LittleReviewer.DynamicType;
+using Dyn = LittleReviewer.DynamicType;
 
 namespace LittleReviewer
 {
@@ -26,6 +29,50 @@ namespace LittleReviewer
             {
                 State_CantFindShare();
             }
+
+            // Test stuff:
+            JourneyStatusGrid.SelectedObject = new PropertyObject { Car = DdTest.Four, Home = "Is where the heart is"};
+
+            // Adding default values to Van...
+            Dyn.TypeDescriptor.InstallTypeDescriptor(JourneyStatusGrid.SelectedObject);
+            var td = Dyn.TypeDescriptor.GetTypeDescriptor(JourneyStatusGrid.SelectedObject);
+            if (td == null) throw new Exception("Could not load type descriptor. Have you installed it?");
+
+            var pd = td.GetProperties().Find("Van", true) as Dyn.PropertyDescriptor;
+            if (pd == null) throw new Exception("Target property not found");
+
+            pd.Attributes.Add(new TypeConverterAttribute(typeof(Dyn.StandardValueConverter)), true);
+
+            var sv = new Dyn.StandardValue("path 1");
+            sv.DisplayName = "Display path 1";
+            pd.StandardValues.Add(sv);
+            
+            sv = new Dyn.StandardValue("path 2");
+            sv.DisplayName = "Display path 2";
+            pd.StandardValues.Add(sv);
+
+
+            // Adding a whole new section...
+            var pd2 = new Dyn.PropertyDescriptor(JourneyStatusGrid.SelectedObject.GetType(), "Dynamic", typeof(string), "dynamic value"
+                ,new BrowsableAttribute(true)
+                ,new DisplayNameAttribute("Dynamically generated")
+                ,new DescriptionAttribute("This was generated at run time")
+                //,new DefaultValueAttribute("")
+                );
+            
+            pd2.Attributes.Add(new TypeConverterAttribute(typeof(Dyn.StandardValueConverter)), true);
+            td.GetProperties().Add(pd2);
+
+            sv = new Dyn.StandardValue("dynalt1");
+            sv.DisplayName = "Display path 1";
+            pd2.StandardValues.Add(sv);
+            
+            sv = new Dyn.StandardValue("dynalt2");
+            sv.DisplayName = "Display path 2";
+            pd2.StandardValues.Add(sv);
+
+
+            JourneyStatusGrid.Refresh();
         }
 
         private void SetupProject(string selectedPath)
@@ -165,6 +212,9 @@ namespace LittleReviewer
 
         private void LoadProjectButton_Click(object sender, System.EventArgs e)
         {
+            // test:
+            Console.WriteLine(JourneyStatusGrid.SelectedObject);
+            // end test
             var result = BrowseForProjectDlog.ShowDialog();
             switch (result)
             {
@@ -247,5 +297,25 @@ namespace LittleReviewer
         {
             new PathsForm().ShowDialog();
         }
+    }
+
+    public class PropertyObject
+    {
+        public DdTest Car { get; set; }
+        public string CommonStatic { get; set; }
+        public string Home { get; set; }
+        public string Legacy { get; set; }
+        public string MyGoCompare { get; set; }
+        public string Van { get; set; }
+        public string WebUI { get; set; }
+    }
+
+    public enum DdTest
+    {
+        [Description("One")] One,
+        [Description("Two")] Two,
+        [Description("Three")] Three,
+        [Description("Four")] Four,
+        [Description("Can I have a little more")] AllTogetherNow
     }
 }
