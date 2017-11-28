@@ -6,7 +6,6 @@ using System.Linq;
 using System.ServiceProcess;
 using System.Windows.Forms;
 using LittleReviewer.DynamicType;
-using Dyn = LittleReviewer.DynamicType;
 
 namespace LittleReviewer
 {
@@ -34,40 +33,40 @@ namespace LittleReviewer
             JourneyStatusGrid.SelectedObject = new PropertyObject { Car = DdTest.Four, Home = "Is where the heart is"};
 
             // Adding default values to Van...
-            Dyn.TypeDescriptor.InstallTypeDescriptor(JourneyStatusGrid.SelectedObject);
-            var td = Dyn.TypeDescriptor.GetTypeDescriptor(JourneyStatusGrid.SelectedObject);
+            DynTypeDescriptor.InstallTypeDescriptor(JourneyStatusGrid.SelectedObject);
+            var td = DynTypeDescriptor.GetTypeDescriptor(JourneyStatusGrid.SelectedObject);
             if (td == null) throw new Exception("Could not load type descriptor. Have you installed it?");
 
-            var pd = td.GetProperties().Find("Van", true) as Dyn.PropertyDescriptor;
+            var pd = td.GetProperties().Find("Van", true) as DynPropertyDescriptor;
             if (pd == null) throw new Exception("Target property not found");
 
-            pd.Attributes.Add(new TypeConverterAttribute(typeof(Dyn.StandardValueConverter)), true);
+            pd.Attributes.Add(new TypeConverterAttribute(typeof(DynStandardValueConverter)), true);
 
-            var sv = new Dyn.StandardValue("path 1");
+            var sv = new DynStandardValue("path 1");
             sv.DisplayName = "Display path 1";
             pd.StandardValues.Add(sv);
             
-            sv = new Dyn.StandardValue("path 2");
+            sv = new DynStandardValue("path 2");
             sv.DisplayName = "Display path 2";
             pd.StandardValues.Add(sv);
 
 
             // Adding a whole new section...
-            var pd2 = new Dyn.PropertyDescriptor(JourneyStatusGrid.SelectedObject.GetType(), "Dynamic", typeof(string), "dynamic value"
+            var pd2 = new DynPropertyDescriptor(JourneyStatusGrid.SelectedObject.GetType(), "Dynamic", typeof(string), "dynamic value"
                 ,new BrowsableAttribute(true)
                 ,new DisplayNameAttribute("Dynamically generated")
                 ,new DescriptionAttribute("This was generated at run time")
                 //,new DefaultValueAttribute("")
                 );
             
-            pd2.Attributes.Add(new TypeConverterAttribute(typeof(Dyn.StandardValueConverter)), true);
+            pd2.Attributes.Add(new TypeConverterAttribute(typeof(DynStandardValueConverter)), true);
             td.GetProperties().Add(pd2);
 
-            sv = new Dyn.StandardValue("dynalt1");
+            sv = new DynStandardValue("dynalt1");
             sv.DisplayName = "Display path 1";
             pd2.StandardValues.Add(sv);
             
-            sv = new Dyn.StandardValue("dynalt2");
+            sv = new DynStandardValue("dynalt2");
             sv.DisplayName = "Display path 2";
             pd2.StandardValues.Add(sv);
 

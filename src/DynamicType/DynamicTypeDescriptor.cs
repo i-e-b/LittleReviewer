@@ -28,7 +28,7 @@ namespace LittleReviewer.DynamicType
         ByIdAscending,
 
         // sort descending using property id or categor id
-        ByIdDescending,
+        ByIdDescending
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Enum)]
@@ -102,17 +102,17 @@ namespace LittleReviewer.DynamicType
 
         public override bool Match(object obj)
         {
-            // Obviously a match.
-            if (Equals(obj, this))
-                return true;
+            if (Equals(obj, this)) return true;
 
-            // Obviously we're not null, so no.
-            if (obj == null)
-                return false;
-
-            var attribute = obj as ResourceAttribute;
-            if (attribute != null) return attribute.GetHashCode() == GetHashCode();
-            return false;
+            switch (obj)
+            {
+                case null:
+                    return false;
+                case ResourceAttribute attribute:
+                    return attribute.GetHashCode() == GetHashCode();
+                default:
+                    return false;
+            }
         }
     }
 
@@ -327,16 +327,16 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    public class StandardValue
+    public class DynStandardValue
     {
-        public StandardValue(object value)
+        public DynStandardValue(object value)
         {
             Value = value;
             Enabled = true;
             Visible = true;
         }
 
-        public StandardValue(object value, string displayName)
+        public DynStandardValue(object value, string displayName)
         {
             DisplayName = displayName;
             Value = value;
@@ -344,7 +344,7 @@ namespace LittleReviewer.DynamicType
             Visible = true;
         }
 
-        public StandardValue(object value, string displayName, string description)
+        public DynStandardValue(object value, string displayName, string description)
         {
             Value = value;
             DisplayName = displayName;
@@ -379,9 +379,9 @@ namespace LittleReviewer.DynamicType
         {
             // let the property browser know we'd like
             // to do custom painting.
-            if (context != null && context.PropertyDescriptor is PropertyDescriptor)
+            if (context != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+                var pd = (DynPropertyDescriptor) context.PropertyDescriptor;
                 return (pd.ValueImage != null);
             }
             return base.GetPaintValueSupported(context);
@@ -394,33 +394,22 @@ namespace LittleReviewer.DynamicType
 
         public override void PaintValue(PaintValueEventArgs pe)
         {
-            if (pe.Context != null)
+            if (pe.Context != null && pe.Context.PropertyDescriptor != null && pe.Context.PropertyDescriptor is DynPropertyDescriptor pd && pd.ValueImage != null)
             {
-                if (pe.Context.PropertyDescriptor != null)
-                {
-                    if (pe.Context.PropertyDescriptor is PropertyDescriptor)
-                    {
-                        PropertyDescriptor pd = pe.Context.PropertyDescriptor as PropertyDescriptor;
-
-                        if (pd.ValueImage != null)
-                        {
-                            pe.Graphics.DrawImage(pd.ValueImage, pe.Bounds);
-                            return;
-                        }
-                    }
-                }
+                pe.Graphics.DrawImage(pd.ValueImage, pe.Bounds);
+                return;
             }
             base.PaintValue(pe);
         }
     }
 
-    public class StandardValueConverter : Scm.TypeConverter
+    public class DynStandardValueConverter : Scm.TypeConverter
     {
         public override bool CanConvertFrom(Scm.ITypeDescriptorContext context, Type sourceType)
         {
             if (context != null &&
                 context.PropertyDescriptor != null &&
-                context.PropertyDescriptor is PropertyDescriptor &&
+                context.PropertyDescriptor is DynPropertyDescriptor &&
                 sourceType == typeof(string))
             {
                 return true;
@@ -434,8 +423,8 @@ namespace LittleReviewer.DynamicType
         {
             if (context != null &&
                 context.PropertyDescriptor != null &&
-                context.PropertyDescriptor is PropertyDescriptor &&
-                (destinationType == typeof(string) || destinationType == typeof(StandardValue)))
+                context.PropertyDescriptor is DynPropertyDescriptor &&
+                (destinationType == typeof(string) || destinationType == typeof(DynStandardValue)))
             {
                 return true;
             }
@@ -446,29 +435,29 @@ namespace LittleReviewer.DynamicType
 
         public override object ConvertFrom(Scm.ITypeDescriptorContext context, CultureInfo culture, object value)
         {
-            object retObj = null;
-            if (context == null || context.PropertyDescriptor == null || !(context.PropertyDescriptor is PropertyDescriptor) || value == null)
+            object retObj;
+            if (context.PropertyDescriptor == null || !(context.PropertyDescriptor is DynPropertyDescriptor) || value == null)
             {
                 retObj = base.ConvertFrom(context, culture, value);
                 return retObj;
             }
 
-            PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+            var pd = (DynPropertyDescriptor) context.PropertyDescriptor;
 
             if (value is string)
             {
-                foreach (StandardValue sv in pd.StandardValues)
+                foreach (var sv in pd.StandardValues)
                 {
-                    if (String.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
-                        String.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
+                    if (string.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
+                        string.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
                     {
                         return sv.Value;
                     }
                 }
             }
-            else if (value is StandardValue)
+            else if (value is DynStandardValue)
             {
-                return (value as StandardValue).Value;
+                return ((DynStandardValue) value).Value;
             }
 
             // try the native converter of the value.
@@ -480,14 +469,11 @@ namespace LittleReviewer.DynamicType
 
         public override object ConvertTo(Scm.ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
         {
-            object retObj = null;
-
-            if (context == null || context.PropertyDescriptor == null || !(context.PropertyDescriptor is PropertyDescriptor) || value == null)
+            if (context == null || context.PropertyDescriptor == null || !(context.PropertyDescriptor is DynPropertyDescriptor) || value == null)
             {
-                retObj = base.ConvertTo(context, culture, value, destinationType);
-                return retObj;
+                return base.ConvertTo(context, culture, value, destinationType);
             }
-            PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+            var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
 
             if (value is string)
             {
@@ -495,13 +481,13 @@ namespace LittleReviewer.DynamicType
                 {
                     return value;
                 }
-                else if (destinationType == pd.PropertyType)
+                if (destinationType == pd.PropertyType)
                 {
                     return ConvertFrom(context, culture, value);
                 }
-                else if (destinationType == typeof(StandardValue))
+                if (destinationType == typeof(DynStandardValue))
                 {
-                    foreach (StandardValue sv in pd.StandardValues)
+                    foreach (DynStandardValue sv in pd.StandardValues)
                     {
                         if (String.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
                             String.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
@@ -515,7 +501,7 @@ namespace LittleReviewer.DynamicType
             {
                 if (destinationType == typeof(string))
                 {
-                    foreach (StandardValue sv in pd.StandardValues)
+                    foreach (DynStandardValue sv in pd.StandardValues)
                     {
                         if (sv.Value.Equals(value))
                         {
@@ -523,9 +509,9 @@ namespace LittleReviewer.DynamicType
                         }
                     }
                 }
-                else if (destinationType == typeof(StandardValue))
+                else if (destinationType == typeof(DynStandardValue))
                 {
-                    foreach (StandardValue sv in pd.StandardValues)
+                    foreach (DynStandardValue sv in pd.StandardValues)
                     {
                         if (sv.Value.Equals(value))
                         {
@@ -538,15 +524,14 @@ namespace LittleReviewer.DynamicType
             // try the native converter of the value.
             Scm.TypeConverter tc = Scm.TypeDescriptor.GetConverter(context.PropertyDescriptor.PropertyType);
             Debug.Assert(tc != null);
-            retObj = tc.ConvertTo(context, culture, value, destinationType);
-            return retObj;
+            return tc.ConvertTo(context, culture, value, destinationType);
         }
 
         public override bool GetStandardValuesSupported(Scm.ITypeDescriptorContext context)
         {
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is PropertyDescriptor)
+            if (context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                return (context.PropertyDescriptor as PropertyDescriptor).StandardValues.Count > 0;
+                return ((DynPropertyDescriptor)context.PropertyDescriptor).StandardValues.Count > 0;
             }
             return base.GetStandardValuesSupported(context);
         }
@@ -566,17 +551,17 @@ namespace LittleReviewer.DynamicType
 
         public override StandardValuesCollection GetStandardValues(Scm.ITypeDescriptorContext context)
         {
-            if (context == null || context.PropertyDescriptor == null || !(context.PropertyDescriptor is PropertyDescriptor))
+            if (context.PropertyDescriptor == null || !(context.PropertyDescriptor is DynPropertyDescriptor))
             {
                 return base.GetStandardValues(context);
             }
-            PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
-            List<object> list = new List<object>();
-            foreach (StandardValue sv in pd.StandardValues)
+            var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
+            var list = new List<object>();
+            foreach (DynStandardValue sv in pd.StandardValues)
             {
                 list.Add(sv.Value);
             }
-            StandardValuesCollection svc = new StandardValuesCollection(list);
+            var svc = new StandardValuesCollection(list);
 
             return svc;
         }
@@ -584,54 +569,38 @@ namespace LittleReviewer.DynamicType
 
     public class ExpandableIEnumerationConverter : Scm.TypeConverter
     {
-        public ExpandableIEnumerationConverter()
-          : base()
-        {
-        }
-
         public override bool GetPropertiesSupported(Scm.ITypeDescriptorContext context)
         {
-            if (context != null)
-            {
-                IEnumerable enu = context.PropertyDescriptor.GetValue(context.Instance) as IEnumerable;
-                return (enu != null);
-            }
-            return base.GetPropertiesSupported(context);
+            if (context == null || context.PropertyDescriptor == null) return base.GetPropertiesSupported(context);
+            return context.PropertyDescriptor.GetValue(context.Instance) is IEnumerable;
         }
 
         public override Scm.PropertyDescriptorCollection GetProperties(Scm.ITypeDescriptorContext context, object value, Attribute[] attributes)
         {
-            if (value == null)
-            {
-                return base.GetProperties(context, value, attributes);
-            }
-            Scm.PropertyDescriptorCollection pdc = new Scm.PropertyDescriptorCollection(null, false);
-            int nIndex = -1;
+            var pdc = new Scm.PropertyDescriptorCollection(null, false);
+            var nIndex = -1;
 
-            IEnumerable en = value as IEnumerable;
-            Debug.Assert(en != null);
+            if (!(value is IEnumerable en)) return pdc;
 
-            if (en != null)
+            var enu = en.GetEnumerator();
+            enu.Reset();
+            while (enu.MoveNext())
             {
-                IEnumerator enu = en.GetEnumerator();
-                enu.Reset();
-                while (enu.MoveNext())
+                nIndex++;
+                if (enu.Current == null) continue;
+                string sPropName = enu.Current.ToString();
+
+                if (enu.Current is Scm.IComponent comp && comp.Site != null && !string.IsNullOrEmpty(comp.Site.Name))
                 {
-                    nIndex++;
-                    string sPropName = enu.Current.ToString();
-
-                    Scm.IComponent comp = enu.Current as Scm.IComponent;
-                    if (comp != null && comp.Site != null && !String.IsNullOrEmpty(comp.Site.Name))
-                    {
-                        sPropName = comp.Site.Name;
-                    }
-                    else if (value.GetType().IsArray)
-                    {
-                        sPropName = "[" + nIndex.ToString() + "]";
-                    }
-                    pdc.Add(new PropertyDescriptor(value.GetType(), sPropName, enu.Current.GetType(), enu.Current, Scm.TypeDescriptor.GetAttributes(enu.Current).ToArray()));
+                    sPropName = comp.Site.Name;
                 }
+                else if (value.GetType().IsArray)
+                {
+                    sPropName = "[" + nIndex + "]";
+                }
+                pdc.Add(new DynPropertyDescriptor(value.GetType(), sPropName, enu.Current.GetType(), enu.Current, Scm.TypeDescriptor.GetAttributes(enu.Current).ToArray()));
             }
+
 
             return pdc;
         }
@@ -646,7 +615,7 @@ namespace LittleReviewer.DynamicType
 
         public override bool CanConvertTo(Scm.ITypeDescriptorContext context, Type destinationType)
         {
-            if (destinationType == typeof(StandardValue))
+            if (destinationType == typeof(DynStandardValue))
             {
                 return true;
             }
@@ -657,37 +626,36 @@ namespace LittleReviewer.DynamicType
         {
             if (value == null)
             {
-                return base.ConvertFrom(context, culture, value);
+                return base.ConvertFrom(context, culture, null);
             }
-            if (value is string)
+            if (value is string sInpuValue)
             {
-                string sInpuValue = value as string;
-                string[] arrDispName = sInpuValue.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var arrDispName = sInpuValue.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
-                StringBuilder sb = new StringBuilder(1000);
+                var sb = new StringBuilder(1000);
                 foreach (string sDispName in arrDispName)
                 {
                     string sTrimValue = sDispName.Trim();
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
+                    foreach (var sv in GetAllPossibleValues(context))
                     {
                         UpdateStringFromResource(context, sv);
 
-                        if (String.Compare(sv.Value.ToString(), sTrimValue, true) == 0 ||
-                            String.Compare(sv.DisplayName, sTrimValue, true) == 0)
+                        if (string.Compare(sv.Value.ToString(), sTrimValue, StringComparison.OrdinalIgnoreCase) == 0 ||
+                            string.Compare(sv.DisplayName, sTrimValue, StringComparison.OrdinalIgnoreCase) == 0)
                         {
                             if (sb.Length > 0)
                             {
                                 sb.Append(",");
                             }
-                            sb.Append(sv.Value.ToString());
+                            sb.Append(sv.Value);
                         }
                     }
-                }  // end of foreach..loop
-                return Enum.Parse(this.EnumType, sb.ToString(), true);
+                }
+                return Enum.Parse(EnumType, sb.ToString(), true);
             }
-            else if (value is StandardValue)
+            if (value is DynStandardValue standardValue)
             {
-                return (value as StandardValue).Value;
+                return standardValue.Value;
             }
             return base.ConvertFrom(context, culture, value);
         }
@@ -696,7 +664,7 @@ namespace LittleReviewer.DynamicType
         {
             if (value == null)
             {
-                return base.ConvertTo(context, culture, value, destinationType);
+                return base.ConvertTo(context, culture, null, destinationType);
             }
             if (value is string)
             {
@@ -704,13 +672,13 @@ namespace LittleReviewer.DynamicType
                 {
                     return value;
                 }
-                else if (destinationType == this.EnumType)
+                if (destinationType == EnumType)
                 {
                     return ConvertFrom(context, culture, value);
                 }
-                else if (destinationType == typeof(StandardValue))
+                if (destinationType == typeof(DynStandardValue))
                 {
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
+                    foreach (DynStandardValue sv in GetAllPossibleValues(context))
                     {
                         UpdateStringFromResource(context, sv);
 
@@ -722,23 +690,23 @@ namespace LittleReviewer.DynamicType
                     }
                 }
             }
-            else if (value.GetType() == this.EnumType)
+            else if (value.GetType() == EnumType)
             {
                 if (destinationType == typeof(string))
                 {
-                    string sDelimitedValues = Enum.Format(this.EnumType, value, "G");
-                    string[] arrValue = sDelimitedValues.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    string sDelimitedValues = Enum.Format(EnumType, value, "G");
+                    string[] arrValue = sDelimitedValues.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
-                    StringBuilder sb = new StringBuilder(1000);
+                    var sb = new StringBuilder(1000);
                     foreach (string sDispName in arrValue)
                     {
                         string sTrimValue = sDispName.Trim();
-                        foreach (StandardValue sv in GetAllPossibleValues(context))
+                        foreach (var sv in GetAllPossibleValues(context))
                         {
                             UpdateStringFromResource(context, sv);
 
-                            if (String.Compare(sv.Value.ToString(), sTrimValue, true) == 0 ||
-                                String.Compare(sv.DisplayName, sTrimValue, true) == 0)
+                            if (string.Compare(sv.Value.ToString(), sTrimValue, StringComparison.OrdinalIgnoreCase) == 0 ||
+                                string.Compare(sv.DisplayName, sTrimValue, StringComparison.OrdinalIgnoreCase) == 0)
                             {
                                 if (sb.Length > 0)
                                 {
@@ -747,12 +715,12 @@ namespace LittleReviewer.DynamicType
                                 sb.Append(sv.DisplayName);
                             }
                         }
-                    }  // end of foreach..loop
+                    }
                     return sb.ToString();
                 }
-                else if (destinationType == typeof(StandardValue))
+                if (destinationType == typeof(DynStandardValue))
                 {
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
+                    foreach (DynStandardValue sv in GetAllPossibleValues(context))
                     {
                         if (sv.Value.Equals(value))
                         {
@@ -761,7 +729,7 @@ namespace LittleReviewer.DynamicType
                         }
                     }
                 }
-                else if (destinationType == this.EnumType)
+                else if (destinationType == EnumType)
                 {
                     return value;
                 }
@@ -772,35 +740,31 @@ namespace LittleReviewer.DynamicType
 
         public override StandardValuesCollection GetStandardValues(Scm.ITypeDescriptorContext context)
         {
-            List<Object> list = new List<Object>();
-            foreach (StandardValue sv in GetAllPossibleValues(context))
-            {
-                list.Add(sv.Value);
-            }
-            StandardValuesCollection svc = new StandardValuesCollection(list as ICollection);
+            var list = GetAllPossibleValues(context).Select(sv => sv.Value).ToList();
+            var svc = new StandardValuesCollection(list);
             return svc;
         }
 
-        private StandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
+        private DynStandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
         {
-            List<StandardValue> list = new List<StandardValue>();
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is PropertyDescriptor)
+            var list = new List<DynStandardValue>();
+            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+                var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
                 list.AddRange(pd.StandardValues);
             }
             else
             {
-                list.AddRange(EnumUtil.GetStandardValues(this.EnumType));
+                list.AddRange(EnumUtil.GetStandardValues(EnumType));
             }
             return list.ToArray();
         }
 
         public override bool GetStandardValuesSupported(Scm.ITypeDescriptorContext context)
         {
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is PropertyDescriptor)
+            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                return (context.PropertyDescriptor as PropertyDescriptor).StandardValues.Count > 0;
+                return ((DynPropertyDescriptor)context.PropertyDescriptor).StandardValues.Count > 0;
             }
             return base.GetStandardValuesSupported(context);
         }
@@ -820,54 +784,51 @@ namespace LittleReviewer.DynamicType
 
         public override bool GetPropertiesSupported(Scm.ITypeDescriptorContext context)
         {
-            ExpandEnumAttribute eea = null;
+            ExpandEnumAttribute eea;
 
-            if (context != null && context.PropertyDescriptor is PropertyDescriptor)
+            if (context != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+                var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
                 eea = (ExpandEnumAttribute)pd.Attributes.Get(typeof(ExpandEnumAttribute), true);
             }
             else
             {
-                eea = (ExpandEnumAttribute)Scm.TypeDescriptor.GetAttributes(this.EnumType).Get(typeof(ExpandableIEnumerationConverter), true);
+                eea = (ExpandEnumAttribute)Scm.TypeDescriptor.GetAttributes(EnumType).Get(typeof(ExpandableIEnumerationConverter), true);
             }
 
-            if (eea == null)
-            {
-                return false;
-            }
-            return eea.Exapand;
+            return eea != null && eea.Exapand;
         }
 
         public override Scm.PropertyDescriptorCollection GetProperties(Scm.ITypeDescriptorContext context, object value, Attribute[] attributes)
         {
+            if (context.PropertyDescriptor == null) { return null; }
+
             Scm.DefaultValueAttribute dva = context.PropertyDescriptor.Attributes.Get(typeof(Scm.DefaultValueAttribute)) as Scm.DefaultValueAttribute;
 
             Scm.PropertyDescriptorCollection pdc = new Scm.PropertyDescriptorCollection(null, false);
-            foreach (StandardValue sv in GetAllPossibleValues(context))
+            foreach (DynStandardValue sv in GetAllPossibleValues(context))
             {
-                if (sv.Visible)
-                {
-                    UpdateStringFromResource(context, sv);
-                    EnumChildPropertyDescriptor epd = new EnumChildPropertyDescriptor(context, sv.Value.ToString(), sv.Value);
-                    epd.Attributes.Add(new Scm.ReadOnlyAttribute(!sv.Enabled), true);
-                    epd.Attributes.Add(new Scm.DescriptionAttribute(sv.Description), true);
-                    epd.Attributes.Add(new Scm.DisplayNameAttribute(sv.DisplayName), true);
-                    epd.Attributes.Add(new Scm.BrowsableAttribute(sv.Visible), true);
+                if (!sv.Visible) continue;
 
-                    // setup the default value;
-                    if (dva != null)
-                    {
-                        bool bHasBit = EnumUtil.IsBitsOn(dva.Value, sv.Value);
-                        epd.DefaultValue = bHasBit;
-                    }
-                    pdc.Add(epd);
+                UpdateStringFromResource(context, sv);
+                var epd = new EnumChildPropertyDescriptor(context, sv.Value.ToString(), sv.Value);
+                epd.Attributes.Add(new Scm.ReadOnlyAttribute(!sv.Enabled), true);
+                epd.Attributes.Add(new Scm.DescriptionAttribute(sv.Description), true);
+                epd.Attributes.Add(new Scm.DisplayNameAttribute(sv.DisplayName), true);
+                epd.Attributes.Add(new Scm.BrowsableAttribute(sv.Visible), true);
+
+                // setup the default value;
+                if (dva != null)
+                {
+                    bool bHasBit = EnumUtil.IsBitsOn(dva.Value, sv.Value);
+                    epd.DefaultValue = bHasBit;
                 }
+                pdc.Add(epd);
             }
             return pdc;
         }
 
-        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, StandardValue sv)
+        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, DynStandardValue sv)
         {
             ResourceAttribute ra = null;
 
@@ -877,7 +838,7 @@ namespace LittleReviewer.DynamicType
             }
             if (ra == null)
             {
-                ra = (ResourceAttribute)Scm.TypeDescriptor.GetAttributes(this.EnumType).Get(typeof(ResourceAttribute));
+                ra = (ResourceAttribute)Scm.TypeDescriptor.GetAttributes(EnumType).Get(typeof(ResourceAttribute));
             }
 
             if (ra == null)
@@ -885,7 +846,7 @@ namespace LittleReviewer.DynamicType
                 return;
             }
 
-            ResourceManager rm = null;
+            ResourceManager rm;
 
             // construct the resource manager using the resInfo
             try
@@ -896,15 +857,15 @@ namespace LittleReviewer.DynamicType
                 }
                 else if (String.IsNullOrEmpty(ra.BaseName) == false)
                 {
-                    rm = new ResourceManager(ra.BaseName, this.EnumType.Assembly);
+                    rm = new ResourceManager(ra.BaseName, EnumType.Assembly);
                 }
                 else if (String.IsNullOrEmpty(ra.BaseName) == false)
                 {
-                    rm = new ResourceManager(ra.BaseName, this.EnumType.Assembly);
+                    rm = new ResourceManager(ra.BaseName, EnumType.Assembly);
                 }
                 else
                 {
-                    rm = new ResourceManager(this.EnumType);
+                    rm = new ResourceManager(EnumType);
                 }
             }
             catch (Exception ex)
@@ -915,8 +876,8 @@ namespace LittleReviewer.DynamicType
 
             // update the display and description string from resource using the resource manager
 
-            string keyName = ra.KeyPrefix + sv.Value.ToString() + "_Name";  // display name
-            string keyDesc = ra.KeyPrefix + sv.Value.ToString() + "_Desc"; // description
+            string keyName = ra.KeyPrefix + sv.Value + "_Name";  // display name
+            string keyDesc = ra.KeyPrefix + sv.Value + "_Desc"; // description
             string dispName = String.Empty;
             string description = String.Empty;
             try
@@ -953,9 +914,13 @@ namespace LittleReviewer.DynamicType
 
         public int Compare(object x, object y)
         {
-            PropertyDescriptor xCpd = x as PropertyDescriptor;
-            PropertyDescriptor yCpd = y as PropertyDescriptor;
+            DynPropertyDescriptor xCpd = x as DynPropertyDescriptor;
+            DynPropertyDescriptor yCpd = y as DynPropertyDescriptor;
 
+            if (xCpd == null || yCpd == null)
+            {
+                return 0;
+            }
             xCpd.AppendCount = 0;
             yCpd.AppendCount = 0;
             int nCompResult = 0;
@@ -974,11 +939,11 @@ namespace LittleReviewer.DynamicType
                     break;
 
                 case SortOrder.ByNameAscending:
-                    nCompResult = xCpd.Category.CompareTo(yCpd.Category);
+                    nCompResult = string.Compare(xCpd.Category, yCpd.Category, StringComparison.Ordinal);
                     break;
 
                 case SortOrder.ByNameDescending:
-                    nCompResult = xCpd.Category.CompareTo(yCpd.Category) * -1;
+                    nCompResult = string.Compare(xCpd.Category, yCpd.Category, StringComparison.Ordinal) * -1;
                     break;
             }
             if (nCompResult == 0)
@@ -990,7 +955,7 @@ namespace LittleReviewer.DynamicType
 
         #endregion IComparer<PropertyDescriptor> Members
 
-        private int CompareProperty(PropertyDescriptor xCpd, PropertyDescriptor yCpd)
+        private int CompareProperty(DynPropertyDescriptor xCpd, DynPropertyDescriptor yCpd)
         {
             int nCompResult = 0;
 
@@ -1009,11 +974,11 @@ namespace LittleReviewer.DynamicType
                     break;
 
                 case SortOrder.ByNameAscending:
-                    nCompResult = xCpd.DisplayName.CompareTo(yCpd.DisplayName);
+                    nCompResult = string.Compare(xCpd.DisplayName, yCpd.DisplayName, StringComparison.Ordinal);
                     break;
 
                 case SortOrder.ByNameDescending:
-                    nCompResult = xCpd.DisplayName.CompareTo(yCpd.DisplayName) * -1;
+                    nCompResult = string.Compare(xCpd.DisplayName, yCpd.DisplayName, StringComparison.Ordinal) * -1;
                     break;
             }
             return nCompResult;
@@ -1048,14 +1013,12 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    public class TypeDescriptor : Scm.CustomTypeDescriptor
+    public class DynTypeDescriptor : Scm.CustomTypeDescriptor
     {
-        private Scm.PropertyDescriptorCollection m_pdc = new Scm.PropertyDescriptorCollection(null, false);
-        private object m_instance = null;
-        private Hashtable m_hashRM = new Hashtable();
+        private readonly Scm.PropertyDescriptorCollection m_pdc = new Scm.PropertyDescriptorCollection(null, false);
+        private readonly object m_instance;
 
-        public TypeDescriptor(Scm.ICustomTypeDescriptor ctd, object instance)
-          : base(ctd)
+        public DynTypeDescriptor(Scm.ICustomTypeDescriptor ctd, object instance) : base(ctd)
         {
             m_instance = instance;
         }
@@ -1084,13 +1047,12 @@ namespace LittleReviewer.DynamicType
         {
             if (m_pdc.Count == 0)
             {
-                Scm.PropertyDescriptorCollection pdc = null;
-                pdc = base.GetProperties();  // this gives us a readonly collection, no good
+                var pdc = base.GetProperties();
                 foreach (Scm.PropertyDescriptor pd in pdc)
                 {
-                    if (!(pd is PropertyDescriptor))
+                    if (!(pd is DynPropertyDescriptor))
                     {
-                        PropertyDescriptor dynPd = null;
+                        DynPropertyDescriptor dynPd;
                         if (pd.PropertyType.IsEnum)
                         {
                             dynPd = new EnumPropertyDescriptor(pd);
@@ -1101,7 +1063,7 @@ namespace LittleReviewer.DynamicType
                         }
                         else
                         {
-                            dynPd = new PropertyDescriptor(pd);
+                            dynPd = new DynPropertyDescriptor(pd);
                         }
                         m_pdc.Add(dynPd);
                     }
@@ -1116,46 +1078,46 @@ namespace LittleReviewer.DynamicType
 
         private void PreProcess(Scm.PropertyDescriptorCollection pdc)
         {
-            if (pdc.Count > 0)
+            if (pdc.Count <= 0) return;
+            UpdateStringFromResource(pdc);
+
+            var propSorter = new PropertySorter
             {
-                UpdateStringFromResource(pdc);
+                CategorySortOrder = CategorySortOrder,
+                PropertySortOrder = PropertySortOrder
+            };
+            var pdcSorted = pdc.Sort(propSorter);
 
-                PropertySorter propSorter = new PropertySorter();
-                propSorter.CategorySortOrder = this.CategorySortOrder;
-                propSorter.PropertySortOrder = this.PropertySortOrder;
-                Scm.PropertyDescriptorCollection pdcSorted = pdc.Sort(propSorter);
+            UpdateAppendCount(pdcSorted);
 
-                UpdateAppendCount(pdcSorted);
-
-                pdc.Clear();
-                foreach (Scm.PropertyDescriptor pd in pdcSorted)
-                {
-                    pdc.Add(pd);
-                }
-            }
+            pdc.Clear();
+            foreach (Scm.PropertyDescriptor pd in pdcSorted) { pdc.Add(pd); }
         }
 
         private void UpdateAppendCount(Scm.PropertyDescriptorCollection pdc)
         {
-            if (this.CategorySortOrder == SortOrder.None)
+            if (CategorySortOrder == SortOrder.None)
             {
                 return;
             }
             int nTabCount = 0;
-            if (this.CategorySortOrder == SortOrder.ByNameAscending || this.CategorySortOrder == SortOrder.ByNameDescending)
+            if (CategorySortOrder == SortOrder.ByNameAscending || CategorySortOrder == SortOrder.ByNameDescending)
             {
                 string sCatName = null;
 
                 // iterate from last to first
                 for (int i = pdc.Count - 1; i >= 0; i--)
                 {
-                    PropertyDescriptor pd = pdc[i] as PropertyDescriptor;
-                    if (sCatName == null)
+                    var pd = pdc[i] as DynPropertyDescriptor;
+                    if (sCatName == null )
                     {
-                        sCatName = pd.Category;
-                        pd.AppendCount = nTabCount;
+                        if (pd != null)
+                        {
+                            sCatName = pd.Category;
+                            pd.AppendCount = nTabCount;
+                        }
                     }
-                    else if (String.Compare(pd.Category, sCatName, true) == 0)
+                    else if (pd != null && string.Compare(pd.Category, sCatName, StringComparison.OrdinalIgnoreCase) == 0)
                     {
                         pd.AppendCount = nTabCount;
                     }
@@ -1163,7 +1125,7 @@ namespace LittleReviewer.DynamicType
                     {
                         nTabCount++;
                         sCatName = pdc[i].Category;
-                        pd.AppendCount = nTabCount;
+                        if (pd != null) pd.AppendCount = nTabCount;
                     }
                 }
             }
@@ -1174,70 +1136,40 @@ namespace LittleReviewer.DynamicType
                 // iterate from last to first
                 for (int i = pdc.Count - 1; i >= 0; i--)
                 {
-                    PropertyDescriptor pd = pdc[i] as PropertyDescriptor;
+                    var pd = pdc[i] as DynPropertyDescriptor;
                     if (nCatID == null)
                     {
-                        nCatID = pd.CategoryId;
-                        pd.AppendCount = nTabCount;
+                        if (pd != null)
+                        {
+                            nCatID = pd.CategoryId;
+                            pd.AppendCount = nTabCount;
+                        }
                     }
-                    if (pd.CategoryId == nCatID)
+                    if (pd != null && pd.CategoryId == nCatID)
                     {
                         pd.AppendCount = nTabCount;
                     }
                     else
                     {
                         nTabCount++;
-                        nCatID = pd.CategoryId;
-                        pd.AppendCount = nTabCount;
+                        if (pd != null)
+                        {
+                            nCatID = pd.CategoryId;
+                            pd.AppendCount = nTabCount;
+                        }
                     }
                 }
             }
         }
 
-        //private void WritePdc( Scm.PropertyDescriptorCollection pdc )
-        //{
-        //  Console.WriteLine("============================================================================");
-        //  Console.WriteLine("PropSort=" + this.PropertySortOrder.ToString( ));
-        //  Console.WriteLine("CatSort=" + this.CategorySortOrder.ToString( ));
-        //  foreach (PropertyDescriptor pd in pdc)
-        //  {
-        //    String s = String.Format("Name={0}; Cat={1}; Tab={2}; CatID={3}; PropID={4}", pd.Name, pd.Category, pd.AppendCount, pd.CategoryId, pd.PropertyId);
-        //    Console.WriteLine(s);
-        //  }
-        //}
+        public SortOrder PropertySortOrder { get; set; } = SortOrder.ByIdAscending;
 
-        private SortOrder m_PropertySortOrder = SortOrder.ByIdAscending;
-
-        public SortOrder PropertySortOrder
-        {
-            get
-            {
-                return m_PropertySortOrder;
-            }
-            set
-            {
-                m_PropertySortOrder = value;
-            }
-        }
-
-        private SortOrder m_CategorySortOrder = SortOrder.ByIdAscending;
-
-        public SortOrder CategorySortOrder
-        {
-            get
-            {
-                return m_CategorySortOrder;
-            }
-            set
-            {
-                m_CategorySortOrder = value;
-            }
-        }
+        public SortOrder CategorySortOrder { get; set; } = SortOrder.ByIdAscending;
 
         private void UpdateStringFromResource(Scm.PropertyDescriptorCollection pdc)
         {
             ResourceAttribute ra = (ResourceAttribute)GetAttributes().Get(typeof(ResourceAttribute), true);
-            ResourceManager rm = null;
+            ResourceManager rm;
             if (ra == null)
             {
                 return;
@@ -1245,17 +1177,17 @@ namespace LittleReviewer.DynamicType
 
             try
             {
-                if (String.IsNullOrEmpty(ra.BaseName) == false && String.IsNullOrEmpty(ra.AssemblyFullName) == false)
+                if (string.IsNullOrEmpty(ra.BaseName) == false && String.IsNullOrEmpty(ra.AssemblyFullName) == false)
                 {
                     rm = new ResourceManager(ra.BaseName, Assembly.ReflectionOnlyLoad(ra.AssemblyFullName));
                 }
-                else if (String.IsNullOrEmpty(ra.BaseName) == false)
+                else if (string.IsNullOrEmpty(ra.BaseName) == false)
                 {
-                    rm = new ResourceManager(ra.BaseName, this.m_instance.GetType().Assembly);
+                    rm = new ResourceManager(ra.BaseName, m_instance.GetType().Assembly);
                 }
                 else
                 {
-                    rm = new ResourceManager(this.m_instance.GetType());
+                    rm = new ResourceManager(m_instance.GetType());
                 }
             }
             catch (Exception ex)
@@ -1264,8 +1196,8 @@ namespace LittleReviewer.DynamicType
                 return;
             }
 
-            string sKeyPrefix = (ra != null ? ra.KeyPrefix : "");
-            foreach (PropertyDescriptor pd in pdc)
+            string sKeyPrefix = (ra.KeyPrefix);
+            foreach (DynPropertyDescriptor pd in pdc)
             {
                 Scm.LocalizableAttribute la = (Scm.LocalizableAttribute)pd.Attributes.Get(typeof(Scm.LocalizableAttribute), true);
                 if (la != null && !pd.IsLocalizable)
@@ -1278,85 +1210,76 @@ namespace LittleReviewer.DynamicType
                 }
 
                 //al = pd.AttributeList;
-                string sKey = String.Empty;
-                string sResult = String.Empty;
+                string sKey;
+                string sResult;
 
                 // first category
-                if (!String.IsNullOrEmpty(pd.CategoryResourceKey))
+                if (!string.IsNullOrEmpty(pd.CategoryResourceKey))
                 {
                     sKey = sKeyPrefix + pd.CategoryResourceKey;
-                    sResult = String.Empty;
 
                     try
                     {
                         sResult = rm.GetString(sKey);
-                        if (!String.IsNullOrEmpty(sResult))
+                        if (!string.IsNullOrEmpty(sResult))
                         {
                             pd.Attributes.Add(new Scm.CategoryAttribute(sResult), true);
                         }
                     }
                     catch (Exception)
                     {
-                        Console.WriteLine(String.Format("Key '{0}' does not exist in the resource.", sKey));
+                        Console.WriteLine("Key '{0}' does not exist in the resource.", sKey);
                     }
                 }
 
                 // now display name
                 sKey = sKeyPrefix + pd.Name + "_Name";
-                sResult = String.Empty;
                 try
                 {
                     sResult = rm.GetString(sKey);
-                    if (!String.IsNullOrEmpty(sResult))
+                    if (!string.IsNullOrEmpty(sResult))
                     {
                         pd.Attributes.Add(new Scm.DisplayNameAttribute(sResult), typeof(Scm.DisplayNameAttribute));
                     }
                 }
                 catch (Exception)
                 {
-                    Console.WriteLine(String.Format("Key '{0}' does not exist in the resource.", sKey));
+                    Console.WriteLine("Key '{0}' does not exist in the resource.", sKey);
                 }
 
                 // and now description
                 sKey = sKeyPrefix + pd.Name + "_Desc";
-                sResult = String.Empty;
                 try
                 {
                     sResult = rm.GetString(sKey);
-                    if (!String.IsNullOrEmpty(sResult))
+                    if (!string.IsNullOrEmpty(sResult))
                     {
                         pd.Attributes.Add(new Scm.DescriptionAttribute(sResult), true);
                     }
                 }
                 catch (Exception)
                 {
-                    Console.WriteLine(String.Format("Key '{0}' does not exist in the resource.", sKey));
+                    Console.WriteLine("Key '{0}' does not exist in the resource.", sKey);
                 }
             }
         }
 
-        private Scm.ISite m_site = null;
+        private Scm.ISite m_site;
 
         public Scm.ISite GetSite()
         {
-            if (m_site == null)
-            {
-                SimpleSite site = new SimpleSite();
-                IPropertyValueUIService service = new PropertyValueUIService();
-                service.AddPropertyValueUIHandler(new PropertyValueUIHandler(this.GenericPropertyValueUIHandler));
-                site.AddService(service);
-                m_site = site;
-            }
+            if (m_site != null) return m_site;
+            var site = new SimpleSite();
+            IPropertyValueUIService service = new PropertyValueUIService();
+            service.AddPropertyValueUIHandler(GenericPropertyValueUIHandler);
+            site.AddService(service);
+            m_site = site;
             return m_site;
         }
 
         private void GenericPropertyValueUIHandler(Scm.ITypeDescriptorContext context, Scm.PropertyDescriptor propDesc, ArrayList itemList)
         {
-            PropertyDescriptor pd = propDesc as PropertyDescriptor;
-            if (pd != null)
-            {
-                itemList.AddRange(pd.StateItems as ICollection);
-            }
+            if (propDesc is DynPropertyDescriptor pd && pd.StateItems is ICollection) itemList.AddRange((ICollection)pd.StateItems);
         }
 
         public void ResetProperties()
@@ -1365,196 +1288,141 @@ namespace LittleReviewer.DynamicType
             GetProperties();
         }
 
-        private static Hashtable m_HashRef = new Hashtable();
+        private static readonly Hashtable TypeDescriptorTable = new Hashtable();
 
-        public static TypeDescriptor GetTypeDescriptor(object instance)
+        public static DynTypeDescriptor GetTypeDescriptor(object instance)
         {
             CleanUpRef();
-            foreach (DictionaryEntry de in m_HashRef)
-            {
-                WeakReference wr = de.Key as WeakReference;
-                if (wr.IsAlive && instance.Equals(wr.Target))
-                {
-                    return de.Value as TypeDescriptor;
-                }
-            }
-            return null;
+            return (from DictionaryEntry de in TypeDescriptorTable let wr = de.Key as WeakReference where wr != null && (wr.IsAlive && instance.Equals(wr.Target)) select de.Value as DynTypeDescriptor).FirstOrDefault();
         }
 
         public static bool InstallTypeDescriptor(object instance)
         {
             CleanUpRef();
-            foreach (DictionaryEntry de in m_HashRef)
+            if ((from DictionaryEntry de in TypeDescriptorTable select de.Key as WeakReference).Any(wr => wr != null && (wr.IsAlive && instance.Equals(wr.Target))))
             {
-                WeakReference wr = de.Key as WeakReference;
-                if (wr.IsAlive && instance.Equals(wr.Target))
-                {
-                    return false; // because already installed
-                }
+                return false; // because already installed
             }
 
-            //// will have to install the provider and create a new entry in the hash table
-            Scm.TypeDescriptionProvider parentProvider = Scm.TypeDescriptor.GetProvider(instance);
-            Scm.ICustomTypeDescriptor parentCtd = parentProvider.GetTypeDescriptor(instance);
-            TypeDescriptor ourCtd = new TypeDescriptor(parentCtd, instance);
-            TypeDescriptionProvider ourProvider = new TypeDescriptionProvider(parentProvider, ourCtd);
+            // will have to install the provider and create a new entry in the hash table
+            var parentProvider = Scm.TypeDescriptor.GetProvider(instance);
+            var parentCtd = parentProvider.GetTypeDescriptor(instance);
+            var ourCtd = new DynTypeDescriptor(parentCtd, instance);
+            var ourProvider = new TypeDescriptionProvider(parentProvider, ourCtd);
             Scm.TypeDescriptor.AddProvider(ourProvider, instance);
-            WeakReference weakRef = new WeakReference(instance, true);
-            m_HashRef.Add(weakRef, ourCtd);
+            var weakRef = new WeakReference(instance, true);
+            TypeDescriptorTable.Add(weakRef, ourCtd);
             return true;
         }
 
-        static private void CleanUpRef()
+        private static void CleanUpRef()
         {
-            List<WeakReference> m_DeadList = new List<WeakReference>();
-            foreach (WeakReference wr in m_HashRef.Keys)
+            var deadList = TypeDescriptorTable.Keys.Cast<WeakReference>().Where(wr => !wr.IsAlive).ToList();
+            foreach (var wr in deadList)
             {
-                if (!wr.IsAlive)
-                {
-                    m_DeadList.Add(wr);
-                }
-            }
-            foreach (WeakReference wr in m_DeadList)
-            {
-                m_HashRef.Remove(wr);
+                TypeDescriptorTable.Remove(wr);
             }
         }
     }
 
     public class StructWrapper : Scm.ICustomTypeDescriptor
     {
-        public StructWrapper()
-        {
-        }
+        public StructWrapper() { }
 
         public StructWrapper(object structObject)
         {
             Debug.Assert(structObject != null);
             Debug.Assert(structObject.GetType().IsValueType);
-            m_Struct = structObject;
+            Struct = structObject;
         }
 
-        private object m_Struct = null;
-
-        [Scm.Browsable(false)]
-        public object Struct
-        {
-            get
-            {
-                return m_Struct;
-            }
-            set
-            {
-                m_Struct = value;
-            }
-        }
-
-        #region ICustomTypeDescriptor Members
+        [Scm.BrowsableAttribute(false)]
+        public object Struct { get; set; }
 
         Scm.AttributeCollection Scm.ICustomTypeDescriptor.GetAttributes()
         {
-            return Scm.TypeDescriptor.GetAttributes(this.m_Struct);
+            return Scm.TypeDescriptor.GetAttributes(Struct);
         }
 
         string Scm.ICustomTypeDescriptor.GetClassName()
         {
-            return Scm.TypeDescriptor.GetClassName(this.m_Struct);
+            return Scm.TypeDescriptor.GetClassName(Struct);
         }
 
         string Scm.ICustomTypeDescriptor.GetComponentName()
         {
-            return Scm.TypeDescriptor.GetComponentName(this.m_Struct);
+            return Scm.TypeDescriptor.GetComponentName(Struct);
         }
 
         Scm.TypeConverter Scm.ICustomTypeDescriptor.GetConverter()
         {
-            return Scm.TypeDescriptor.GetConverter(this.m_Struct);
+            return Scm.TypeDescriptor.GetConverter(Struct);
         }
 
         Scm.EventDescriptor Scm.ICustomTypeDescriptor.GetDefaultEvent()
         {
-            return Scm.TypeDescriptor.GetDefaultEvent(this.m_Struct);
+            return Scm.TypeDescriptor.GetDefaultEvent(Struct);
         }
 
         Scm.PropertyDescriptor Scm.ICustomTypeDescriptor.GetDefaultProperty()
         {
-            return Scm.TypeDescriptor.GetDefaultProperty(this.m_Struct);
+            return Scm.TypeDescriptor.GetDefaultProperty(Struct);
         }
 
         object Scm.ICustomTypeDescriptor.GetEditor(Type editorBaseType)
         {
-            return Scm.TypeDescriptor.GetEditor(this.m_Struct, editorBaseType);
+            return Scm.TypeDescriptor.GetEditor(Struct, editorBaseType);
         }
 
         Scm.EventDescriptorCollection Scm.ICustomTypeDescriptor.GetEvents(Attribute[] attributes)
         {
-            return Scm.TypeDescriptor.GetEvents(this.m_Struct, attributes);
+            return Scm.TypeDescriptor.GetEvents(Struct, attributes);
         }
 
         Scm.EventDescriptorCollection Scm.ICustomTypeDescriptor.GetEvents()
         {
-            return Scm.TypeDescriptor.GetEvents(this.m_Struct);
+            return Scm.TypeDescriptor.GetEvents(Struct);
         }
 
         Scm.PropertyDescriptorCollection Scm.ICustomTypeDescriptor.GetProperties(Attribute[] attributes)
         {
-            return Scm.TypeDescriptor.GetProperties(this.m_Struct, attributes);
+            return Scm.TypeDescriptor.GetProperties(Struct, attributes);
         }
 
         Scm.PropertyDescriptorCollection Scm.ICustomTypeDescriptor.GetProperties()
         {
-            return Scm.TypeDescriptor.GetProperties(this.m_Struct);
+            return Scm.TypeDescriptor.GetProperties(Struct);
         }
 
         object Scm.ICustomTypeDescriptor.GetPropertyOwner(Scm.PropertyDescriptor pd)
         {
-            return m_Struct;
+            return Struct;
         }
-
-        #endregion ICustomTypeDescriptor Members
     }
 
     internal class TypeDescriptionProvider : Scm.TypeDescriptionProvider
     {
-        private Scm.TypeDescriptionProvider m_parent = null;
-        private Scm.ICustomTypeDescriptor m_ctd = null;
+        private readonly Scm.ICustomTypeDescriptor m_ctd;
 
-        public TypeDescriptionProvider()
-          : base()
-        {
-        }
+        public TypeDescriptionProvider() { } 
+        public TypeDescriptionProvider(Scm.TypeDescriptionProvider parent) : base(parent) { }
 
-        public TypeDescriptionProvider(Scm.TypeDescriptionProvider parent)
-          : base(parent)
-        {
-            m_parent = parent;
-        }
+        public TypeDescriptionProvider(Scm.TypeDescriptionProvider parent, Scm.ICustomTypeDescriptor ctd) : base(parent) { m_ctd = ctd; }
 
-        public TypeDescriptionProvider(Scm.TypeDescriptionProvider parent, Scm.ICustomTypeDescriptor ctd)
-          : base(parent)
-        {
-            m_parent = parent;
-            m_ctd = ctd;
-        }
-
-        public override Scm.ICustomTypeDescriptor GetTypeDescriptor(Type objectType, object instance)
-        {
-            return m_ctd;
-        }
+        public override Scm.ICustomTypeDescriptor GetTypeDescriptor(Type objectType, object instance) { return m_ctd; }
     }
 
-    public class PropertyDescriptor : Scm.PropertyDescriptor
+    public class DynPropertyDescriptor : Scm.PropertyDescriptor
     {
-        private Type m_compType = null;
-        private Type m_PropType = null;
-        private Scm.PropertyDescriptor m_pd = null;
+        private readonly Type m_compType;
+        private readonly Type m_PropType;
+        private readonly Scm.PropertyDescriptor m_pd;
         private readonly List<PropertyValueUIItem> m_colUIItem = new List<PropertyValueUIItem>();
         private static readonly char m_HiddenChar = '\t';
         private static ulong m_COUNT = 1;
         internal readonly ulong _ID;
 
-        public PropertyDescriptor(Type componentType, string sName, Type propType, object value, params Attribute[] attributes)
-          : base(sName, attributes)
+        public DynPropertyDescriptor(Type componentType, string sName, Type propType, object value, params Attribute[] attributes) : base(sName, attributes)
         {
             _ID = m_COUNT++;
             m_compType = componentType;
@@ -1562,52 +1430,22 @@ namespace LittleReviewer.DynamicType
             m_PropType = propType;
         }
 
-        public PropertyDescriptor(Scm.PropertyDescriptor pd)
-          : base(pd)
+        public DynPropertyDescriptor(Scm.PropertyDescriptor pd) : base(pd)
         {
             _ID = m_COUNT++;
             m_pd = pd;
         }
 
-        public override Type ComponentType
-        {
-            get
-            {
-                if (m_pd != null)
-                {
-                    return m_pd.ComponentType;
-                }
-                return m_compType;
-            }
-        }
+        public override Type ComponentType { get { return m_pd != null ? m_pd.ComponentType : m_compType; } }
 
-        public override Type PropertyType
-        {
-            get
-            {
-                if (m_pd != null)
-                {
-                    return m_pd.PropertyType;
-                }
-                return m_PropType;
-            }
-        }
-
-        /// <summary>
-        /// Must override abstract properties.
-        /// </summary>
-        ///
+        public override Type PropertyType { get { return m_pd != null ? m_pd.PropertyType : m_PropType; } }
 
         public override bool IsReadOnly
         {
             get
             {
                 Scm.ReadOnlyAttribute attr = (Scm.ReadOnlyAttribute)Attributes.Get(typeof(Scm.ReadOnlyAttribute), true);
-                if (attr != null)
-                {
-                    return attr.IsReadOnly;
-                }
-                return false;
+                return attr != null && attr.IsReadOnly;
             }
         }
 
@@ -1618,11 +1456,12 @@ namespace LittleReviewer.DynamicType
                 string sOut = base.Category;
 
                 Scm.CategoryAttribute attr = (Scm.CategoryAttribute)Attributes.Get(typeof(Scm.CategoryAttribute), true);
-                if (attr != null)
+                if (attr != null && attr.Category != null)
                 {
                     sOut = attr.Category;
                 }
-                sOut = sOut.PadLeft(sOut.Length + m_AppendCount, m_HiddenChar);
+                if (sOut == null) return null;
+                sOut = sOut.PadLeft(sOut.Length + AppendCount, m_HiddenChar);
                 return sOut;
             }
         }
@@ -1714,27 +1553,9 @@ namespace LittleReviewer.DynamicType
             }
         }
 
-        private int m_AppendCount = 0;
+        internal int AppendCount { get; set; }
 
-        internal int AppendCount
-        {
-            get
-            {
-                return m_AppendCount;
-            }
-            set
-            {
-                m_AppendCount = value;
-            }
-        }
-
-        public override bool DesignTimeOnly
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public override bool DesignTimeOnly { get { return false; } }
 
         private object m_value;
 
@@ -1743,11 +1564,7 @@ namespace LittleReviewer.DynamicType
             Debug.Assert(component != null);
             Debug.Assert(component.GetType() == ComponentType);
 
-            if (m_pd != null)
-            {
-                return m_pd.GetValue(component);
-            }
-            return m_value;
+            return m_pd != null ? m_pd.GetValue(component) : m_value;
         }
 
         public override void SetValue(object component, object value)
@@ -1764,7 +1581,7 @@ namespace LittleReviewer.DynamicType
             {
                 m_pd.SetValue(component, m_value);
             }
-            base.OnValueChanged(component, new EventArgs());
+            OnValueChanged(component, new EventArgs());
         }
 
         /// <summary>
@@ -1781,7 +1598,7 @@ namespace LittleReviewer.DynamicType
             }
             else
             {
-                SetValue(component, this.DefaultValue);
+                SetValue(component, DefaultValue);
             }
         }
 
@@ -1790,14 +1607,10 @@ namespace LittleReviewer.DynamicType
             Debug.Assert(component != null);
             Debug.Assert(component.GetType() == ComponentType);
 
-            if (this.DefaultValue == null)
-            {
-                return false;
-            }
+            if (DefaultValue == null) { return false; }
 
-            object value = GetValue(component);
-            bool bOk = !value.Equals(this.DefaultValue);
-            return bOk;
+            var value = GetValue(component);
+            return value != null && !value.Equals(DefaultValue);
         }
 
         public override bool ShouldSerializeValue(object component)
@@ -1805,69 +1618,40 @@ namespace LittleReviewer.DynamicType
             Debug.Assert(component != null);
             Debug.Assert(component.GetType() == ComponentType);
 
-            if (this.DefaultValue == null)
-            {
-                return true;
-            }
-            bool bOk = CanResetValue(component);
-            return bOk;
+            return DefaultValue == null || CanResetValue(component);
         }
 
-        public ICollection<PropertyValueUIItem> StateItems
-        {
-            get
-            {
-                return m_colUIItem;
-            }
-        }
+        public ICollection<PropertyValueUIItem> StateItems { get { return m_colUIItem; } }
 
-        protected List<StandardValue> m_StatandardValues = new List<StandardValue>();
+        protected List<DynStandardValue> m_StandardValues = new List<DynStandardValue>();
 
-        public virtual IList<StandardValue> StandardValues
-        {
-            get
-            {
-                return m_StatandardValues;
-            }
-        }
+        public virtual IList<DynStandardValue> StandardValues { get { return m_StandardValues; } }
 
         public Image ValueImage { get; set; } = null;
 
-        internal int LCID
-        {
-            get;
-            set;
-        }
+        internal int LCID { get; set; }
     }
 
-    public class EnumPropertyDescriptor : PropertyDescriptor
+    public class EnumPropertyDescriptor : DynPropertyDescriptor
     {
-        public EnumPropertyDescriptor(Scm.PropertyDescriptor pd)
-          : base(pd)
+        public EnumPropertyDescriptor(Scm.PropertyDescriptor pd) : base(pd)
         {
             Debug.Assert(pd.PropertyType.IsEnum);
 
-            base.m_StatandardValues.Clear();
-            StandardValue[] svaArr = EnumUtil.GetStandardValues(this.PropertyType);
-            base.m_StatandardValues.AddRange(svaArr);
+            m_StandardValues.Clear();
+            var svaArr = EnumUtil.GetStandardValues(PropertyType);
+            m_StandardValues.AddRange(svaArr);
         }
 
-        public override IList<StandardValue> StandardValues
-        {
-            get
-            {
-                return m_StatandardValues.AsReadOnly();
-            }
-        }
+        public override IList<DynStandardValue> StandardValues { get { return m_StandardValues.AsReadOnly(); } }
     }
 
     public class EnumChildPropertyDescriptor : BooleanPropertyDescriptor
     {
-        private Scm.ITypeDescriptorContext m_context = null;
-        private object m_enumField = null;  // represent one of the enum field
+        private readonly Scm.ITypeDescriptorContext m_context;
+        private readonly object m_enumField;  // represent one of the enum field
 
-        public EnumChildPropertyDescriptor(Scm.ITypeDescriptorContext context, string sName, object enumFieldvalue, params Attribute[] attributes)
-          : base(enumFieldvalue.GetType(), sName, false, attributes)
+        public EnumChildPropertyDescriptor(Scm.ITypeDescriptorContext context, string sName, object enumFieldvalue, params Attribute[] attributes) : base(enumFieldvalue.GetType(), sName, false, attributes)
         {
             m_context = context;
             m_enumField = enumFieldvalue;
@@ -1881,8 +1665,10 @@ namespace LittleReviewer.DynamicType
             Debug.Assert(value != null);
             Debug.Assert(value.GetType() == PropertyType);
 
+            if (m_context.PropertyDescriptor == null) return;
+
             object enumInstance = m_context.PropertyDescriptor.GetValue(m_context.Instance);
-            bool bModified = false;
+            bool bModified;
             if ((bool)value)
             {
                 bModified = EnumUtil.TurnOnBits(ref enumInstance, m_enumField);
@@ -1892,12 +1678,11 @@ namespace LittleReviewer.DynamicType
                 bModified = EnumUtil.TurnOffBits(ref enumInstance, m_enumField);
             }
 
-            if (bModified)
-            {
-                FieldInfo fi = component.GetType().GetField("value__", BindingFlags.Instance | BindingFlags.Public);
-                fi.SetValue(component, enumInstance);
-                m_context.PropertyDescriptor.SetValue(m_context.Instance, component);
-            }
+            if (!bModified) return;
+
+            var fi = component.GetType().GetField("value__", BindingFlags.Instance | BindingFlags.Public);
+            if (fi != null) fi.SetValue(component, enumInstance);
+            m_context.PropertyDescriptor.SetValue(m_context.Instance, component);
         }
 
         public override object GetValue(object component)
@@ -1911,7 +1696,7 @@ namespace LittleReviewer.DynamicType
 
     internal class EnumUtil
     {
-        static public bool IsBitsOn(object enumInstance, object bits)
+        public static bool IsBitsOn(object enumInstance, object bits)
         {
             Debug.Assert(enumInstance != null);
             Debug.Assert(enumInstance.GetType().IsEnum);
@@ -1924,70 +1709,56 @@ namespace LittleReviewer.DynamicType
                 return (enumInstance.Equals(bits));
             }
 
-            if (IsZeroDefinend(enumInstance.GetType()))  // special case
+            if (IsZeroDefined(enumInstance.GetType()))  // special case
             {
-                bool isInstanceZero = IsZero(enumInstance);
-                bool isBitZero = IsZero(bits);
-
-                if (isInstanceZero && isBitZero)
-                {
-                    return true;
-                }
-                else if (isInstanceZero && !isBitZero)
-                {
-                    return false;
-                }
-                else if (!isInstanceZero && isBitZero)
-                {
-                    return false;
-                }
+                return (IsZero(enumInstance) && IsZero(bits));
             }
 
             // otherwise (!valueIsZero && !bitsIsZero)
-            Type enumDataType = Enum.GetUnderlyingType(enumInstance.GetType());
+            var enumDataType = Enum.GetUnderlyingType(enumInstance.GetType());
             if (enumDataType == typeof(Int16))
             {
                 Int16 _value = Convert.ToInt16(enumInstance);
                 Int16 _bits = Convert.ToInt16(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(UInt16))
+            if (enumDataType == typeof(UInt16))
             {
                 UInt16 _value = Convert.ToUInt16(enumInstance);
                 UInt16 _bits = Convert.ToUInt16(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(Int32))
+            if (enumDataType == typeof(Int32))
             {
                 Int32 _value = Convert.ToInt32(enumInstance);
                 Int32 _bits = Convert.ToInt32(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(UInt32))
+            if (enumDataType == typeof(UInt32))
             {
                 UInt32 _value = Convert.ToUInt32(enumInstance);
                 UInt32 _bits = Convert.ToUInt32(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(Int64))
+            if (enumDataType == typeof(Int64))
             {
                 Int64 _value = Convert.ToInt64(enumInstance);
                 Int64 _bits = Convert.ToInt64(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(UInt64))
+            if (enumDataType == typeof(UInt64))
             {
                 UInt64 _value = Convert.ToUInt64(enumInstance);
                 UInt64 _bits = Convert.ToUInt64(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(SByte))
+            if (enumDataType == typeof(SByte))
             {
                 SByte _value = Convert.ToSByte(enumInstance);
                 SByte _bits = Convert.ToSByte(bits);
                 return ((_value & _bits) == _bits);
             }
-            else if (enumDataType == typeof(Byte))
+            if (enumDataType == typeof(Byte))
             {
                 Byte _value = Convert.ToByte(enumInstance);
                 Byte _bits = Convert.ToByte(bits);
@@ -1996,7 +1767,7 @@ namespace LittleReviewer.DynamicType
             return false;
         }
 
-        static public bool TurnOffBits(ref object enumInstance, object bits)
+        public static bool TurnOffBits(ref object enumInstance, object bits)
         {
             Debug.Assert(enumInstance != null);
             Debug.Assert(enumInstance.GetType().IsEnum);
@@ -2013,23 +1784,9 @@ namespace LittleReviewer.DynamicType
             {
                 return false;
             }
-            if (IsZeroDefinend(enumInstance.GetType()))  // special case
+            if (IsZeroDefined(enumInstance.GetType()))  // special case
             {
-                bool isInstanceZero = IsZero(enumInstance);
-                bool isBitZero = IsZero(bits);
-
-                if (isInstanceZero && isBitZero)
-                {
-                    return false;
-                }
-                else if (isInstanceZero && !isBitZero)
-                {
-                    return false;
-                }
-                else if (!isInstanceZero && isBitZero)
-                {
-                    return false;
-                }
+                return false;
             }
             Type enumType = enumInstance.GetType();
             Type enumDataType = Enum.GetUnderlyingType(enumInstance.GetType());
@@ -2096,7 +1853,7 @@ namespace LittleReviewer.DynamicType
             return true;
         }
 
-        static public bool TurnOnBits(ref object enumInstance, object bits)
+        public static bool TurnOnBits(ref object enumInstance, object bits)
         {
             Debug.Assert(enumInstance != null);
             Debug.Assert(enumInstance.GetType().IsEnum);
@@ -2106,12 +1863,9 @@ namespace LittleReviewer.DynamicType
 
             if (!IsFlag(enumInstance.GetType()))
             {
-                if (!enumInstance.Equals(bits))
-                {
-                    enumInstance = bits;
-                    return true;
-                }
-                return false;
+                if (enumInstance.Equals(bits)) return false;
+                enumInstance = bits;
+                return true;
             }
 
             if (IsBitsOn(enumInstance, bits)) // already turned on
@@ -2119,25 +1873,9 @@ namespace LittleReviewer.DynamicType
                 return false;
             }
 
-            if (IsZeroDefinend(enumInstance.GetType()))  // special case
+            if (IsZeroDefined(enumInstance.GetType()))  // special case
             {
-                bool isInstanceZero = IsZero(enumInstance);
-                bool isBitZero = IsZero(bits);
-
-                if (isInstanceZero && isBitZero)
-                {
-                    return false;
-                }
-                else if (isInstanceZero && !isBitZero)
-                {
-                    enumInstance = bits;
-                    return true;
-                }
-                else if (!isInstanceZero && isBitZero)
-                {
-                    enumInstance = bits;
-                    return true;
-                }
+                return !(IsZero(enumInstance) && IsZero(bits));
             }
 
             Type enumType = enumInstance.GetType();
@@ -2203,7 +1941,7 @@ namespace LittleReviewer.DynamicType
             return true;
         }
 
-        static public bool IsZeroDefinend(Type enumType)
+        public static bool IsZeroDefined(Type enumType)
         {
             Debug.Assert(enumType != null);
             Debug.Assert(enumType.IsEnum);
@@ -2216,37 +1954,37 @@ namespace LittleReviewer.DynamicType
                 Int16 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(UInt16))
+            if (enumDataType == typeof(UInt16))
             {
                 UInt16 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(Int32))
+            if (enumDataType == typeof(Int32))
             {
                 Int32 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(UInt32))
+            if (enumDataType == typeof(UInt32))
             {
                 UInt32 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(Int64))
+            if (enumDataType == typeof(Int64))
             {
                 Int64 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(UInt64))
+            if (enumDataType == typeof(UInt64))
             {
                 UInt64 zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(SByte))
+            if (enumDataType == typeof(SByte))
             {
                 SByte zero = 0;
                 return Enum.IsDefined(enumType, zero);
             }
-            else if (enumDataType == typeof(Byte))
+            if (enumDataType == typeof(Byte))
             {
                 Byte zero = 0;
                 return Enum.IsDefined(enumType, zero);
@@ -2255,12 +1993,12 @@ namespace LittleReviewer.DynamicType
             return false;
         }
 
-        static public bool IsZero(object enumInstance)
+        public static bool IsZero(object enumInstance)
         {
             Debug.Assert(enumInstance != null);
             Debug.Assert(enumInstance.GetType().IsEnum);
 
-            if (!IsZeroDefinend(enumInstance.GetType()))
+            if (!IsZeroDefined(enumInstance.GetType()))
             {
                 return false;
             }
@@ -2273,43 +2011,43 @@ namespace LittleReviewer.DynamicType
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(UInt16))
+            if (enumDataType == typeof(UInt16))
             {
                 UInt16 zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(Int32))
+            if (enumDataType == typeof(Int32))
             {
                 Int32 zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(UInt32))
+            if (enumDataType == typeof(UInt32))
             {
                 UInt32 zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(Int64))
+            if (enumDataType == typeof(Int64))
             {
                 Int64 zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(UInt64))
+            if (enumDataType == typeof(UInt64))
             {
                 UInt64 zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(SByte))
+            if (enumDataType == typeof(SByte))
             {
                 SByte zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
                 return objZero.Equals(enumInstance);
             }
-            else if (enumDataType == typeof(Byte))
+            if (enumDataType == typeof(Byte))
             {
                 Byte zero = 0;
                 object objZero = Enum.ToObject(enumInstance.GetType(), zero);
@@ -2319,21 +2057,21 @@ namespace LittleReviewer.DynamicType
             return false;
         }
 
-        static public bool IsFlag(Type enumType)
+        public static bool IsFlag(Type enumType)
         {
             Debug.Assert(enumType != null);
             Debug.Assert(enumType.IsEnum);
             return (enumType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0);
         }
 
-        static public StandardValue[] GetStandardValues(object enumInstance)
+        public static DynStandardValue[] GetStandardValues(object enumInstance)
         {
             Debug.Assert(enumInstance != null);
             Debug.Assert(enumInstance.GetType().IsEnum);
             return GetStandardValues(enumInstance.GetType(), BindingFlags.Public | BindingFlags.Instance);
         }
 
-        static public StandardValue[] GetStandardValues(Type enumType)
+        public static DynStandardValue[] GetStandardValues(Type enumType)
         {
             Debug.Assert(enumType != null);
             Debug.Assert(enumType.IsEnum);
@@ -2341,42 +2079,38 @@ namespace LittleReviewer.DynamicType
             return GetStandardValues(enumType, BindingFlags.Public | BindingFlags.Static);
         }
 
-        static private StandardValue[] GetStandardValues(Type enumType, BindingFlags flags)
+        private static DynStandardValue[] GetStandardValues(Type enumType, BindingFlags flags)
         {
-            ArrayList arrAttr = new ArrayList();
-            FieldInfo[] fields = enumType.GetFields(flags);
+            var arrAttr = new ArrayList();
+            var fields = enumType.GetFields(flags);
 
-            foreach (FieldInfo fi in fields)
+            foreach (var fi in fields)
             {
-                StandardValue sv = new StandardValue(Enum.ToObject(enumType, fi.GetValue(null)));
+                var sv = new DynStandardValue(Enum.ToObject(enumType, fi.GetValue(null)));
                 sv.DisplayName = Enum.GetName(enumType, sv.Value); // by default
 
-                DynDisplayNameAttribute[] dna = fi.GetCustomAttributes(typeof(DynDisplayNameAttribute), false) as DynDisplayNameAttribute[];
-                if (dna != null && dna.Length > 0)
+                if (fi.GetCustomAttributes(typeof(DynDisplayNameAttribute), false) is DynDisplayNameAttribute[] dna && dna.Length > 0)
                 {
                     sv.DisplayName = dna[0].DisplayName;
                 }
 
-                Scm.DescriptionAttribute[] da = fi.GetCustomAttributes(typeof(Scm.DescriptionAttribute), false) as Scm.DescriptionAttribute[];
-                if (da != null && da.Length > 0)
+                if (fi.GetCustomAttributes(typeof(Scm.DescriptionAttribute), false) is Scm.DescriptionAttribute[] da && da.Length > 0)
                 {
                     sv.Description = da[0].Description;
                 }
 
-                Scm.BrowsableAttribute[] ba = fi.GetCustomAttributes(typeof(Scm.BrowsableAttribute), false) as Scm.BrowsableAttribute[];
-                if (ba != null && ba.Length > 0)
+                if (fi.GetCustomAttributes(typeof(Scm.BrowsableAttribute), false) is Scm.BrowsableAttribute[] ba && ba.Length > 0)
                 {
                     sv.Visible = ba[0].Browsable;
                 }
 
-                Scm.ReadOnlyAttribute[] roa = fi.GetCustomAttributes(typeof(Scm.ReadOnlyAttribute), false) as Scm.ReadOnlyAttribute[];
-                if (roa != null && roa.Length > 0)
+                if (fi.GetCustomAttributes(typeof(Scm.ReadOnlyAttribute), false) is Scm.ReadOnlyAttribute[] roa && roa.Length > 0)
                 {
                     sv.Enabled = !roa[0].IsReadOnly;
                 }
                 arrAttr.Add(sv);
             }
-            StandardValue[] retAttr = arrAttr.ToArray(typeof(StandardValue)) as StandardValue[];
+            var retAttr = arrAttr.ToArray(typeof(DynStandardValue)) as DynStandardValue[];
             return retAttr;
         }
     }
@@ -2384,69 +2118,38 @@ namespace LittleReviewer.DynamicType
     [AttributeUsage(AttributeTargets.All)]
     public class DynDisplayNameAttribute : Scm.DisplayNameAttribute
     {
-        public DynDisplayNameAttribute()
-          : base()
-        {
-        }
-
-        public DynDisplayNameAttribute(string displayName)
-          : base(displayName)
-        {
-        }
+        public DynDisplayNameAttribute() { }
+        public DynDisplayNameAttribute(string displayName) : base(displayName) { }
     }
 
     [AttributeUsage(AttributeTargets.Property)]
-    public class CategoryResourceKeyAttribute : System.Attribute
+    public class CategoryResourceKeyAttribute : Attribute
     {
-        public CategoryResourceKeyAttribute()
-          : base()
-        {
-        }
-
-        public CategoryResourceKeyAttribute(string resourceKey)
-          : base()
-        {
-            ResourceKey = resourceKey;
-        }
-
-        public string ResourceKey
-        {
-            get;
-            set;
-        }
+        public CategoryResourceKeyAttribute() { }
+        public CategoryResourceKeyAttribute(string resourceKey) { ResourceKey = resourceKey; }
+        public string ResourceKey { get; set; }
     }
 
     public class BooleanConverter : Scm.BooleanConverter
     {
-        public BooleanConverter()
-          : base()
-        {
-        }
-
         public override bool CanConvertTo(Scm.ITypeDescriptorContext context, Type destinationType)
         {
-            if (destinationType == typeof(StandardValue))
-            {
-                return true;
-            }
-            return base.CanConvertTo(context, destinationType);
+            return destinationType == typeof(DynStandardValue) || base.CanConvertTo(context, destinationType);
         }
 
         public override object ConvertFrom(Scm.ITypeDescriptorContext context, CultureInfo culture, object value)
         {
-            if (value is string)
+            if (!(value is string)) return base.ConvertFrom(context, culture, value);
+            var sInpuValue = (string)value;
+            sInpuValue = sInpuValue.Trim();
+            foreach (var sv in GetAllPossibleValues(context))
             {
-                string sInpuValue = value as string;
-                sInpuValue = sInpuValue.Trim();
-                foreach (StandardValue sv in GetAllPossibleValues(context))
-                {
-                    UpdateStringFromResource(context, sv);
+                UpdateStringFromResource(context, sv);
 
-                    if (String.Compare(sv.Value.ToString(), sInpuValue, true) == 0 ||
-                        String.Compare(sv.DisplayName, sInpuValue, true) == 0)
-                    {
-                        return sv.Value;
-                    }
+                if (string.Compare(sv.Value.ToString(), sInpuValue, StringComparison.OrdinalIgnoreCase) == 0 ||
+                    string.Compare(sv.DisplayName, sInpuValue, StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    return sv.Value;
                 }
             }
             return base.ConvertFrom(context, culture, value);
@@ -2460,44 +2163,38 @@ namespace LittleReviewer.DynamicType
                 {
                     return value;
                 }
-                else if (destinationType == typeof(StandardValue))
+                if (destinationType != typeof(DynStandardValue)) return base.ConvertTo(context, culture, value, destinationType);
+                foreach (var sv in GetAllPossibleValues(context))
                 {
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
-                    {
-                        UpdateStringFromResource(context, sv);
+                    UpdateStringFromResource(context, sv);
 
-                        if (String.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
-                            String.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
-                        {
-                            return sv;
-                        }
+                    if (string.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
+                        string.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
+                    {
+                        return sv;
                     }
                 }
             }
-            else if (value.GetType() == typeof(bool))
+            else if (value is bool)
             {
                 if (destinationType == typeof(string))
                 {
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
+                    foreach (var sv in GetAllPossibleValues(context))
                     {
-                        if (sv.Value.Equals(value))
-                        {
-                            UpdateStringFromResource(context, sv);
+                        if (!sv.Value.Equals(value)) continue;
+                        UpdateStringFromResource(context, sv);
 
-                            return sv.DisplayName;
-                        }
+                        return sv.DisplayName;
                     }
                 }
-                else if (destinationType == typeof(StandardValue))
+                else if (destinationType == typeof(DynStandardValue))
                 {
-                    foreach (StandardValue sv in GetAllPossibleValues(context))
+                    foreach (var sv in GetAllPossibleValues(context))
                     {
-                        if (sv.Value.Equals(value))
-                        {
-                            UpdateStringFromResource(context, sv);
+                        if (!sv.Value.Equals(value)) continue;
+                        UpdateStringFromResource(context, sv);
 
-                            return sv;
-                        }
+                        return sv;
                     }
                 }
             }
@@ -2517,23 +2214,23 @@ namespace LittleReviewer.DynamicType
             return base.GetStandardValuesExclusive(context);
         }
 
-        private StandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
+        private DynStandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
         {
-            List<StandardValue> list = new List<StandardValue>();
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is PropertyDescriptor)
+            var list = new List<DynStandardValue>();
+            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
             {
-                PropertyDescriptor pd = context.PropertyDescriptor as PropertyDescriptor;
+                var pd = (DynPropertyDescriptor) context.PropertyDescriptor;
                 list.AddRange(pd.StandardValues);
             }
             else
             {
-                list.Add(new StandardValue(true));
-                list.Add(new StandardValue(false));
+                list.Add(new DynStandardValue(true));
+                list.Add(new DynStandardValue(false));
             }
             return list.ToArray();
         }
 
-        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, StandardValue sv)
+        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, DynStandardValue sv)
         {
             ResourceAttribute ra = null;
 
@@ -2581,10 +2278,10 @@ namespace LittleReviewer.DynamicType
 
             // update the display and description string from resource using the resource manager
 
-            string keyName = ra.KeyPrefix + sv.Value.ToString() + "_Name";  // display name
-            string keyDesc = ra.KeyPrefix + sv.Value.ToString() + "_Desc"; // description
-            string dispName = String.Empty;
-            string description = String.Empty;
+            string keyName = ra.KeyPrefix + sv.Value + "_Name";  // display name
+            string keyDesc = ra.KeyPrefix + sv.Value + "_Desc"; // description
+            string dispName = string.Empty;
+            string description = string.Empty;
             try
             {
                 dispName = rm.GetString(keyName);
@@ -2593,7 +2290,7 @@ namespace LittleReviewer.DynamicType
             {
                 Console.WriteLine(ex.Message);
             }
-            if (String.IsNullOrEmpty(dispName) == false)
+            if (string.IsNullOrEmpty(dispName) == false)
             {
                 sv.DisplayName = dispName;
             }
@@ -2606,38 +2303,37 @@ namespace LittleReviewer.DynamicType
             {
                 Console.WriteLine(ex.Message);
             }
-            if (String.IsNullOrEmpty(description) == false)
+            if (string.IsNullOrEmpty(description) == false)
             {
                 sv.Description = description;
             }
         }
     }
 
-    public class BooleanPropertyDescriptor : PropertyDescriptor
+    public class BooleanPropertyDescriptor : DynPropertyDescriptor
     {
-        public BooleanPropertyDescriptor(Scm.PropertyDescriptor pd)
-          : base(pd)
+        public BooleanPropertyDescriptor(Scm.PropertyDescriptor pd) : base(pd)
         {
             Debug.Assert(pd.PropertyType == typeof(bool));
 
-            base.m_StatandardValues.Clear();
-            base.m_StatandardValues.Add(new StandardValue(true));
-            base.m_StatandardValues.Add(new StandardValue(false));
+            m_StandardValues.Clear();
+            m_StandardValues.Add(new DynStandardValue(true));
+            m_StandardValues.Add(new DynStandardValue(false));
         }
 
         public BooleanPropertyDescriptor(Type componentType, string sName, bool value, params Attribute[] attributes)
           : base(componentType, sName, typeof(bool), value, attributes)
         {
-            base.m_StatandardValues.Clear();
-            base.m_StatandardValues.Add(new StandardValue(true));
-            base.m_StatandardValues.Add(new StandardValue(false));
+            m_StandardValues.Clear();
+            m_StandardValues.Add(new DynStandardValue(true));
+            m_StandardValues.Add(new DynStandardValue(false));
         }
 
-        public override IList<StandardValue> StandardValues
+        public override IList<DynStandardValue> StandardValues
         {
             get
             {
-                return base.m_StatandardValues.AsReadOnly();
+                return m_StandardValues.AsReadOnly();
             }
         }
     }

@@ -135,8 +135,7 @@ namespace LittleReviewer.DynamicType
         }
         object IServiceProvider.GetService(Type serviceType)
         {
-            object service;
-            if (services != null && services.TryGetValue(serviceType, out service))
+            if (services != null && services.TryGetValue(serviceType, out var service))
             {
                 return service;
             }

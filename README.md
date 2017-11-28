@@ -19,3 +19,4 @@ No commits or pushes are made by this tool.
 - [ ] Show last updated date remote and local
 - [ ] Allow no-action?
 - [ ] Write a 'last source' file in local directories to show current status
+- [ ] Remove 'Cleanup Review'
