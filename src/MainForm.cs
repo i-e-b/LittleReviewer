@@ -149,9 +149,17 @@ namespace LittleReviewer
 
             // TODO: check for an 'Archive.7z' file and copy that instead of files if possible
 
+            AsyncFile.UnpackArchiveFiles = VpnModeCheckbox.Checked;
+
             foreach (var kvp in copiesToMake)
             {
-                AsyncFile.Copy(kvp.Key, kvp.Value);
+                if (VpnModeCheckbox.Checked && NativeIO.Exists(new PathInfo(Path.Combine(kvp.Key, "Archive.7z")))) {
+                    // copy just the archive, then expand as a post-process.
+                    // TODO: write the post-process
+                    AsyncFile.Copy(Path.Combine(kvp.Key, "Archive.7z"), kvp.Value);
+                } else {
+                    AsyncFile.Copy(kvp.Key, kvp.Value);
+                }
             }
         }
 
@@ -371,8 +379,11 @@ namespace LittleReviewer
                     return;
                 }
 
-                CopyProgress.Value = Math.Min(100, (int)((AsyncFile.FilesCopied / (double)AsyncFile.FilesQueued) * 100));
-                SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
+                if (AsyncFile.FilesQueued > 0)
+                {
+                    CopyProgress.Value = Math.Min(100, (int)((AsyncFile.FilesCopied / (double)AsyncFile.FilesQueued) * 100));
+                    SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
+                }
             }
         }
 

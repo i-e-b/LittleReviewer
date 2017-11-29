@@ -39,6 +39,7 @@
             this.JourneyStatusGrid = new System.Windows.Forms.PropertyGrid();
             this.ShowHelpButton = new System.Windows.Forms.Button();
             this.RefreshListButton = new System.Windows.Forms.Button();
+            this.VpnModeCheckbox = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // StatusLabel
@@ -145,11 +146,22 @@
             this.RefreshListButton.UseVisualStyleBackColor = true;
             this.RefreshListButton.Click += new System.EventHandler(this.RefreshListButton_Click);
             // 
+            // VpnModeCheckbox
+            // 
+            this.VpnModeCheckbox.AutoSize = true;
+            this.VpnModeCheckbox.Location = new System.Drawing.Point(16, 93);
+            this.VpnModeCheckbox.Name = "VpnModeCheckbox";
+            this.VpnModeCheckbox.Size = new System.Drawing.Size(155, 17);
+            this.VpnModeCheckbox.TabIndex = 11;
+            this.VpnModeCheckbox.Text = "Slow Network / VPN Mode";
+            this.VpnModeCheckbox.UseVisualStyleBackColor = true;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(638, 425);
+            this.Controls.Add(this.VpnModeCheckbox);
             this.Controls.Add(this.RefreshListButton);
             this.Controls.Add(this.ShowHelpButton);
             this.Controls.Add(this.JourneyStatusGrid);
@@ -164,6 +176,7 @@
             this.Text = "Review Tool";
             this.Load += new System.EventHandler(this.MainForm_Load);
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -179,6 +192,7 @@
         private System.Windows.Forms.PropertyGrid JourneyStatusGrid;
         private System.Windows.Forms.Button ShowHelpButton;
         private System.Windows.Forms.Button RefreshListButton;
+        private System.Windows.Forms.CheckBox VpnModeCheckbox;
     }
 }
 

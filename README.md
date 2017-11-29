@@ -13,7 +13,7 @@ This tool reads, presents and copies those folders around.
 ## To Do:
 
 - [x] Check out multiple projects' pull requests at once
-- [ ] Download and extract `Masters.7z` instead of folder contents if it exists
+- [x] *Allow* download and extract `Archive.7z` instead of folder contents if it exists. Must have switch, as it's much slower when running on a fast network.
 - [ ] More robust error handling & reporting
 - [x] Assume C/CodeReview if it exists
 - [x] Show last updated date remote and local

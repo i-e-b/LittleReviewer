@@ -809,11 +809,11 @@ namespace LittleReviewer
         }
 
         /// <summary>
-        /// Creates the path information container
+        /// Creates the path information container. DOES NOT do path concatenation
         /// </summary>
         /// <param name="anyFullname">Full path to the file or directory (regular or unc). Relative path will be recognized as local regular path.</param>
         /// <param name="name">Name of file or directory</param>
-        public PathInfo(String anyFullname, String name)
+        private PathInfo(String anyFullname, String name)
         {
             PathResult parsePathResult;
             if (!PathTools.TryParsePath(anyFullname, out parsePathResult))
@@ -932,7 +932,8 @@ namespace LittleReviewer
     public enum FileOrDirectory
     {
         File = 0,
-        Directory = 1
+        Directory = 1,
+        Nothing = -1
     }
 
     public enum SuppressExceptions
@@ -1100,17 +1101,19 @@ namespace LittleReviewer
         ///     </see>
         ///     if invalid handle found.
         /// </remarks>
-        public static bool TryGetFindDataFromPath(PathInfo pathInfo, out Win32FindData pathFindData)
+        public static bool TryGetFindDataFromPath(PathInfo pathInfo, out Win32FindData pathFindData, SuppressExceptions suppress = SuppressExceptions.None)
         {
             var win32FindData = new Win32FindData();
             int win32Error;
 
+            pathFindData = null;
 
             using (var fileHandle = FindFirstSafeFileHandle(pathInfo.FullNameUnc, win32FindData, out win32Error))
             {
                 // Take care of invalid handles
                 if (fileHandle.IsInvalid)
                 {
+                    if (suppress == SuppressExceptions.SuppressAllExceptions) { return false; }
                     NativeExceptionMapping(pathInfo.FullName, win32Error);
                 }
 
@@ -1122,7 +1125,6 @@ namespace LittleReviewer
                 }
             }
 
-            pathFindData = null;
             return false;
         }
 
@@ -1320,6 +1322,18 @@ namespace LittleReviewer
                 throw new Exception("UnmatchedFileSystemEntryType " + FileOrDirectory.File + ", " + FileOrDirectory.Directory + ", " + pathInfo.FullName);
             }
             return new FileDetail(pathInfo, findData);
+        }
+
+        /// <summary>
+        /// Returns file, directory or nothing found for a given path
+        /// </summary>
+        public static FileOrDirectory GetTargetKind(PathInfo pathInfo) {
+            Win32FindData findData;
+            if (!TryGetFindDataFromPath(pathInfo, out findData, SuppressExceptions.SuppressAllExceptions))
+            {
+                return FileOrDirectory.Nothing;
+            }
+            return DetermineFileSystemEntry(findData);
         }
 
         internal static FileOrDirectory DetermineFileSystemEntry(Win32FindData findData)
