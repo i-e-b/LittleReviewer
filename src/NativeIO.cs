@@ -962,6 +962,7 @@ namespace LittleReviewer
         {
             PathInfo = pathInfo;
             CalculateSize(win32FindData);
+            CalculateTimes(win32FindData);
         }
 
         /// <summary>
@@ -982,6 +983,17 @@ namespace LittleReviewer
         {
             Bytes = win32FindData.CalculateBytes();
         }
+        
+        /// <summary>
+        /// Work out file dates
+        /// </summary>
+        private void CalculateTimes(Win32FindData data)
+        {
+            long fileTime = (((long)data.ftCreationTime_dwHighDateTime) << 32) + ((long)data.ftCreationTime_dwLowDateTime);
+            CreationDate = DateTime.FromFileTime(fileTime);
+        }
+
+        public DateTime CreationDate { get; set; }
 
         /// <summary>
         /// PathInfo Container

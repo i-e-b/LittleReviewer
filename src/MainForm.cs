@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.ServiceProcess;
+using System.Text;
 using System.Windows.Forms;
 using LittleReviewer.DynamicType;
 
@@ -11,7 +11,6 @@ namespace LittleReviewer
 {
     public partial class MainForm : Form
     {
-        private const string PickPullRequestMessage = "- pick a pull request ID -";
         private readonly List<string> AffectedProducts = new List<string>();
         private string BaseDirectory;
         private string CopyReason = "";
@@ -29,54 +28,30 @@ namespace LittleReviewer
                 State_CantFindShare();
             }
 
+            /*
             // Test stuff:
-            JourneyStatusGrid.SelectedObject = new PropertyObject { Car = DdTest.Four, Home = "Is where the heart is"};
+            //JourneyStatusGrid.SelectedObject = new PropertyObject { Car = DdTest.Four, Home = "Is where the heart is"};
 
-            // Adding default values to Van...
-            DynTypeDescriptor.InstallTypeDescriptor(JourneyStatusGrid.SelectedObject);
-            var td = DynTypeDescriptor.GetTypeDescriptor(JourneyStatusGrid.SelectedObject);
-            if (td == null) throw new Exception("Could not load type descriptor. Have you installed it?");
+            // -- API Desire --
+            var props = DynamicPropertyObject.NewObject();
+            props.AddProperty(key: "Property1", displayName: "Property One", description: "This was generated", initialValue: "init value", standardValues: new[] { "Option 1", "Option 2" });
 
-            var pd = td.GetProperties().Find("Van", true) as DynPropertyDescriptor;
-            if (pd == null) throw new Exception("Target property not found");
-
-            pd.Attributes.Add(new TypeConverterAttribute(typeof(DynStandardValueConverter)), true);
-
-            var sv = new DynStandardValue("path 1");
-            sv.DisplayName = "Display path 1";
-            pd.StandardValues.Add(sv);
-            
-            sv = new DynStandardValue("path 2");
-            sv.DisplayName = "Display path 2";
-            pd.StandardValues.Add(sv);
-
-
-            // Adding a whole new section...
-            var pd2 = new DynPropertyDescriptor(JourneyStatusGrid.SelectedObject.GetType(), "Dynamic", typeof(string), "dynamic value"
-                ,new BrowsableAttribute(true)
-                ,new DisplayNameAttribute("Dynamically generated")
-                ,new DescriptionAttribute("This was generated at run time")
-                //,new DefaultValueAttribute("")
-                );
-            
-            pd2.Attributes.Add(new TypeConverterAttribute(typeof(DynStandardValueConverter)), true);
-            td.GetProperties().Add(pd2);
-
-            sv = new DynStandardValue("dynalt1");
-            sv.DisplayName = "Display path 1";
-            pd2.StandardValues.Add(sv);
-            
-            sv = new DynStandardValue("dynalt2");
-            sv.DisplayName = "Display path 2";
-            pd2.StandardValues.Add(sv);
-
-
+            JourneyStatusGrid.SelectedObject = props;
             JourneyStatusGrid.Refresh();
+            // -- end of api desire --
+            
+            // test:
+            var currentValue = ((PropertyTarget) JourneyStatusGrid.SelectedObject)["Property1"];
+            MessageBox.Show("Current value: "+currentValue);
+            // end test
+            */
         }
 
+        /// <summary>
+        /// This is the main point where we read in the available targets and versions
+        /// </summary>
         private void SetupProject(string selectedPath)
         {
-
             if (new PathInfo(selectedPath).IsRoot)
             {
                 Status_SelectedRoot();
@@ -91,13 +66,8 @@ namespace LittleReviewer
             BaseDirectory = selectedPath;
 
             var prs = NativeIO.EnumerateFiles(Paths.PullRequestRoot, ResultType.DirectoriesOnly).Select(f=>f.Name).ToList();
-            if (prs.Count < 1)
-            {
-                State_NothingToMerge();
-                return;
-            }
 
-            WriteBranchesToDropDown(prs);
+            WriteBranchesToPropertiesGrid(prs);
             State_ReadyToReview();
         }
 
@@ -106,18 +76,9 @@ namespace LittleReviewer
             DisableControls();
             LoadProjectButton.Enabled = true;
             StartReviewButton.Enabled = true;
-            EndReviewButton.Enabled = true;
-            BranchSelectMenu.Enabled = true;
             SetStatus("Project at " + BaseDirectory +" is ready");
         }
 
-        private void State_NothingToMerge()
-        {
-            DisableControls();
-            LoadProjectButton.Enabled = true;
-            SetStatus("There are no pull request builds ready to review.");
-        }
-        
         private void Status_SelectedRoot()
         {
             DisableControls();
@@ -191,29 +152,111 @@ namespace LittleReviewer
             Refresh();
         }
         
-        private void WriteBranchesToDropDown(List<string> branchesAvailable)
+        private void WriteBranchesToPropertiesGrid(List<string> prIds)
         {
+            // Read PRs
+            var options = new Map<string, string>();
+            foreach (var prId in prIds)
+            {
+                var prDirectory = Path.Combine(Paths.PullRequestRoot, prId, Paths.PrContainer);
+                var journeys = NativeIO.EnumerateFiles(prDirectory, ResultType.DirectoriesOnly).Select(f => f.Name).ToList();
+                foreach (var journey in journeys)
+                {
+                    options.Add(journey, prId);
+                }
+            }
+
+            // Read masters
+            var masters = NativeIO.EnumerateFiles(Paths.MastersRoot, ResultType.DirectoriesOnly).Select(f => f.Name).ToList();
+            foreach (var journey in masters)
+            {
+                options.Add(journey, "master");
+            }
+
+            // Render to list
+            var props = DynamicPropertyObject.NewObject();
+            foreach (var journey in options.Keys()) {
+                var local = GetApproximateLocalTime(journey);
+                var remote = GetApproximateMasterTime(journey);
+
+                
+
+                props.AddProperty(key: journey, displayName: journey, description: BuildFileDateDescription(journey),
+                    initialValue: "this should have the recorded last state, or blank", standardValues: options.Get(journey));
+            }
+
+
+            JourneyStatusGrid.SelectedObject = props;
+            JourneyStatusGrid.Refresh();
+            /*
             BranchSelectMenu.Items.Clear();
             BranchSelectMenu.Items.Add(PickPullRequestMessage);
             // ReSharper disable once CoVariantArrayConversion
             BranchSelectMenu.Items.AddRange(branchesAvailable.ToArray());
             BranchSelectMenu.SelectedIndex = 0;
+            */
+            // TODO: This whole thing has to change. Read each PR's journey and add it to that journey's drop downs
+        }
+
+        private string BuildFileDateDescription(string journey)
+        {
+            var sb = new StringBuilder();
+            var local = GetApproximateLocalTime(journey);
+            var remote = GetApproximateMasterTime(journey);
+
+            if (local == null) sb.Append("Local version is empty");
+            else sb.Append("Local version updated " + local.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+
+            sb.Append("\r\n");
+            
+            if (remote == null) sb.Append("Remote version is empty");
+            else sb.Append("Remote version updated " + remote.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+
+            return sb.ToString();
+        }
+
+        private DateTime? GetApproximateMasterTime(string journey)
+        {
+            return GetFolderMedianTime(Path.Combine(Paths.MastersRoot, journey));
+        }
+
+        private DateTime? GetApproximateLocalTime(string journey)
+        {
+            return GetFolderMedianTime(Path.Combine(BaseDirectory, journey));
+        }
+
+        /// <summary>
+        /// Get a median time for file creation at the first level of a directory
+        /// </summary>
+        private DateTime? GetFolderMedianTime(string path)
+        {
+            var allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.TopDirectoryOnly, SuppressExceptions.SuppressAllExceptions)
+                .Select(f=> f.CreationDate)
+                .OrderBy(d=>d)
+                .ToArray();
+
+            if (allDates.Length < 1) { // no top level files, try a sample of deep files
+                allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.AllDirectories, SuppressExceptions.SuppressAllExceptions)
+                    .Take(10)
+                    .Select(f=> f.CreationDate)
+                    .OrderBy(d=>d)
+                    .ToArray();
+    
+                if (allDates.Length < 1) return null; // no files at all
+            }
+            var idx = allDates.Length / 2;
+
+            return allDates[idx];
         }
 
         private void DisableControls()
         {
             LoadProjectButton.Enabled = false;
-            CleanupReviewButton.Enabled = false;
             StartReviewButton.Enabled = false;
-            EndReviewButton.Enabled = false;
-            BranchSelectMenu.Enabled = false;
         }
 
-        private void LoadProjectButton_Click(object sender, System.EventArgs e)
+        private void LoadProjectButton_Click(object sender, EventArgs e)
         {
-            // test:
-            Console.WriteLine(JourneyStatusGrid.SelectedObject);
-            // end test
             var result = BrowseForProjectDlog.ShowDialog();
             switch (result)
             {
@@ -224,25 +267,9 @@ namespace LittleReviewer
             }
         }
 
-        private void CleanupReviewButton_Click(object sender, System.EventArgs e)
+        private void StartReviewButton_Click(object sender, EventArgs e)
         {
-            if (BranchSelectMenu.SelectedIndex < 1)
-            {
-                SetStatus("Pick a pull request to delete");
-                return;
-            }
-
-            // This should delete the pull request folder
-            SetStatus("Deleting Pull Request directory...");
-            //NativeIO.DeleteDirectory("", recursive:true);
-            var prDirectory = Path.Combine(Paths.PullRequestRoot, BranchSelectMenu.Text);
-            Directory.Delete(prDirectory, true);
-            SetupProject(BaseDirectory);
-        }
-
-        private void StartReviewButton_Click(object sender, System.EventArgs e)
-        {
-            if (BranchSelectMenu.SelectedIndex < 1)
+            /*if (BranchSelectMenu.SelectedIndex < 1)
             {
                 SetStatus("Pick a pull request to review");
                 return;
@@ -251,28 +278,13 @@ namespace LittleReviewer
             DisableControls();
             SetStatus("Working...");
             CopyReason = "Updating masters and copying Pull Request";
-            CopyMastersAndPR(BranchSelectMenu.Text);
+            CopyMastersAndPR(BranchSelectMenu.Text);*/
+            // TODO: This needs to be re-worked. Sync all selected journeys
         }
 
-        private void EndReviewButton_Click(object sender, System.EventArgs e)
-        {
-            // The plan: whichever product we copied across, restore that from masters
-            // at the moment, we do the lazy thing of copying everything back
-            DisableControls();
-            SetStatus("Working...");
-            CopyReason = "Resetting to most recent masters";
-            CopyMastersToLocal();
-            SetupProject(BaseDirectory);
-        }
-
-        private void MainForm_Load(object sender, System.EventArgs e) { }
-
-        private void BranchSelectMenu_SelectedIndexChanged(object sender, System.EventArgs e)
-        {
-            CleanupReviewButton.Enabled = BranchSelectMenu.SelectedIndex > 0;
-        }
+        private void MainForm_Load(object sender, EventArgs e) { }
         
-        private void ProgressTimer_Tick(object sender, System.EventArgs e)
+        private void ProgressTimer_Tick(object sender, EventArgs e)
         {
             if (AsyncFile.FilesQueued < 1)
             {
@@ -296,25 +308,10 @@ namespace LittleReviewer
         {
             new PathsForm().ShowDialog();
         }
-    }
 
-    public class PropertyObject
-    {
-        public DdTest Car { get; set; }
-        public string CommonStatic { get; set; }
-        public string Home { get; set; }
-        public string Legacy { get; set; }
-        public string MyGoCompare { get; set; }
-        public string Van { get; set; }
-        public string WebUI { get; set; }
-    }
-
-    public enum DdTest
-    {
-        [Description("One")] One,
-        [Description("Two")] Two,
-        [Description("Three")] Three,
-        [Description("Four")] Four,
-        [Description("Can I have a little more")] AllTogetherNow
+        private void HelpButton_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Help");
+        }
     }
 }

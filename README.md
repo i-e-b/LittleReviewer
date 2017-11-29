@@ -16,7 +16,8 @@ No commits or pushes are made by this tool.
 - [ ] Download and extract `Masters.7z` instead of folder contents if it exists
 - [ ] More robust error handling & reporting
 - [ ] Assume C/CodeReview if it exists
-- [ ] Show last updated date remote and local
+- [x] Show last updated date remote and local
 - [ ] Allow no-action?
 - [ ] Write a 'last source' file in local directories to show current status
 - [ ] Remove 'Cleanup Review'
+- [ ] Help screen

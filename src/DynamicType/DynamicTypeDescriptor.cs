@@ -8,7 +8,6 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Resources;
-using System.Text;
 using Scm = System.ComponentModel;
 
 namespace LittleReviewer.DynamicType
@@ -29,21 +28,6 @@ namespace LittleReviewer.DynamicType
 
         // sort descending using property id or categor id
         ByIdDescending
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Enum)]
-    public class ExpandEnumAttribute : Attribute
-    {
-        public ExpandEnumAttribute(bool expand)
-        {
-            Exapand = expand;
-        }
-
-        public bool Exapand
-        {
-            get;
-            set;
-        }
     }
 
     [AttributeUsage(AttributeTargets.Property)]
@@ -373,36 +357,6 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    public class PropertyValuePaintEditor : UITypeEditor
-    {
-        public override bool GetPaintValueSupported(Scm.ITypeDescriptorContext context)
-        {
-            // let the property browser know we'd like
-            // to do custom painting.
-            if (context != null && context.PropertyDescriptor is DynPropertyDescriptor)
-            {
-                var pd = (DynPropertyDescriptor) context.PropertyDescriptor;
-                return (pd.ValueImage != null);
-            }
-            return base.GetPaintValueSupported(context);
-        }
-
-        public override UITypeEditorEditStyle GetEditStyle(Scm.ITypeDescriptorContext context)
-        {
-            return UITypeEditorEditStyle.None;
-        }
-
-        public override void PaintValue(PaintValueEventArgs pe)
-        {
-            if (pe.Context != null && pe.Context.PropertyDescriptor != null && pe.Context.PropertyDescriptor is DynPropertyDescriptor pd && pd.ValueImage != null)
-            {
-                pe.Graphics.DrawImage(pd.ValueImage, pe.Bounds);
-                return;
-            }
-            base.PaintValue(pe);
-        }
-    }
-
     public class DynStandardValueConverter : Scm.TypeConverter
     {
         public override bool CanConvertFrom(Scm.ITypeDescriptorContext context, Type sourceType)
@@ -567,351 +521,8 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    public class ExpandableIEnumerationConverter : Scm.TypeConverter
+    public class PropertySorter : IComparer
     {
-        public override bool GetPropertiesSupported(Scm.ITypeDescriptorContext context)
-        {
-            if (context == null || context.PropertyDescriptor == null) return base.GetPropertiesSupported(context);
-            return context.PropertyDescriptor.GetValue(context.Instance) is IEnumerable;
-        }
-
-        public override Scm.PropertyDescriptorCollection GetProperties(Scm.ITypeDescriptorContext context, object value, Attribute[] attributes)
-        {
-            var pdc = new Scm.PropertyDescriptorCollection(null, false);
-            var nIndex = -1;
-
-            if (!(value is IEnumerable en)) return pdc;
-
-            var enu = en.GetEnumerator();
-            enu.Reset();
-            while (enu.MoveNext())
-            {
-                nIndex++;
-                if (enu.Current == null) continue;
-                string sPropName = enu.Current.ToString();
-
-                if (enu.Current is Scm.IComponent comp && comp.Site != null && !string.IsNullOrEmpty(comp.Site.Name))
-                {
-                    sPropName = comp.Site.Name;
-                }
-                else if (value.GetType().IsArray)
-                {
-                    sPropName = "[" + nIndex + "]";
-                }
-                pdc.Add(new DynPropertyDescriptor(value.GetType(), sPropName, enu.Current.GetType(), enu.Current, Scm.TypeDescriptor.GetAttributes(enu.Current).ToArray()));
-            }
-
-
-            return pdc;
-        }
-    }
-
-    public class EnumConverter : Scm.EnumConverter
-    {
-        public EnumConverter(Type type)
-          : base(type)
-        {
-        }
-
-        public override bool CanConvertTo(Scm.ITypeDescriptorContext context, Type destinationType)
-        {
-            if (destinationType == typeof(DynStandardValue))
-            {
-                return true;
-            }
-            return base.CanConvertTo(context, destinationType);
-        }
-
-        public override object ConvertFrom(Scm.ITypeDescriptorContext context, CultureInfo culture, object value)
-        {
-            if (value == null)
-            {
-                return base.ConvertFrom(context, culture, null);
-            }
-            if (value is string sInpuValue)
-            {
-                var arrDispName = sInpuValue.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-                var sb = new StringBuilder(1000);
-                foreach (string sDispName in arrDispName)
-                {
-                    string sTrimValue = sDispName.Trim();
-                    foreach (var sv in GetAllPossibleValues(context))
-                    {
-                        UpdateStringFromResource(context, sv);
-
-                        if (string.Compare(sv.Value.ToString(), sTrimValue, StringComparison.OrdinalIgnoreCase) == 0 ||
-                            string.Compare(sv.DisplayName, sTrimValue, StringComparison.OrdinalIgnoreCase) == 0)
-                        {
-                            if (sb.Length > 0)
-                            {
-                                sb.Append(",");
-                            }
-                            sb.Append(sv.Value);
-                        }
-                    }
-                }
-                return Enum.Parse(EnumType, sb.ToString(), true);
-            }
-            if (value is DynStandardValue standardValue)
-            {
-                return standardValue.Value;
-            }
-            return base.ConvertFrom(context, culture, value);
-        }
-
-        public override object ConvertTo(Scm.ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
-        {
-            if (value == null)
-            {
-                return base.ConvertTo(context, culture, null, destinationType);
-            }
-            if (value is string)
-            {
-                if (destinationType == typeof(string))
-                {
-                    return value;
-                }
-                if (destinationType == EnumType)
-                {
-                    return ConvertFrom(context, culture, value);
-                }
-                if (destinationType == typeof(DynStandardValue))
-                {
-                    foreach (DynStandardValue sv in GetAllPossibleValues(context))
-                    {
-                        UpdateStringFromResource(context, sv);
-
-                        if (String.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
-                            String.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
-                        {
-                            return sv;
-                        }
-                    }
-                }
-            }
-            else if (value.GetType() == EnumType)
-            {
-                if (destinationType == typeof(string))
-                {
-                    string sDelimitedValues = Enum.Format(EnumType, value, "G");
-                    string[] arrValue = sDelimitedValues.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-                    var sb = new StringBuilder(1000);
-                    foreach (string sDispName in arrValue)
-                    {
-                        string sTrimValue = sDispName.Trim();
-                        foreach (var sv in GetAllPossibleValues(context))
-                        {
-                            UpdateStringFromResource(context, sv);
-
-                            if (string.Compare(sv.Value.ToString(), sTrimValue, StringComparison.OrdinalIgnoreCase) == 0 ||
-                                string.Compare(sv.DisplayName, sTrimValue, StringComparison.OrdinalIgnoreCase) == 0)
-                            {
-                                if (sb.Length > 0)
-                                {
-                                    sb.Append(", ");
-                                }
-                                sb.Append(sv.DisplayName);
-                            }
-                        }
-                    }
-                    return sb.ToString();
-                }
-                if (destinationType == typeof(DynStandardValue))
-                {
-                    foreach (DynStandardValue sv in GetAllPossibleValues(context))
-                    {
-                        if (sv.Value.Equals(value))
-                        {
-                            UpdateStringFromResource(context, sv);
-                            return sv;
-                        }
-                    }
-                }
-                else if (destinationType == EnumType)
-                {
-                    return value;
-                }
-            }
-
-            return base.ConvertTo(context, culture, value, destinationType);
-        }
-
-        public override StandardValuesCollection GetStandardValues(Scm.ITypeDescriptorContext context)
-        {
-            var list = GetAllPossibleValues(context).Select(sv => sv.Value).ToList();
-            var svc = new StandardValuesCollection(list);
-            return svc;
-        }
-
-        private DynStandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
-        {
-            var list = new List<DynStandardValue>();
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
-            {
-                var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
-                list.AddRange(pd.StandardValues);
-            }
-            else
-            {
-                list.AddRange(EnumUtil.GetStandardValues(EnumType));
-            }
-            return list.ToArray();
-        }
-
-        public override bool GetStandardValuesSupported(Scm.ITypeDescriptorContext context)
-        {
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
-            {
-                return ((DynPropertyDescriptor)context.PropertyDescriptor).StandardValues.Count > 0;
-            }
-            return base.GetStandardValuesSupported(context);
-        }
-
-        public override bool GetStandardValuesExclusive(Scm.ITypeDescriptorContext context)
-        {
-            if (context != null && context.PropertyDescriptor != null)
-            {
-                ExclusiveStandardValuesAttribute psfa = (ExclusiveStandardValuesAttribute)context.PropertyDescriptor.Attributes.Get(typeof(ExclusiveStandardValuesAttribute), true);
-                if (psfa != null)
-                {
-                    return psfa.Exclusive;
-                }
-            }
-            return base.GetStandardValuesExclusive(context);
-        }
-
-        public override bool GetPropertiesSupported(Scm.ITypeDescriptorContext context)
-        {
-            ExpandEnumAttribute eea;
-
-            if (context != null && context.PropertyDescriptor is DynPropertyDescriptor)
-            {
-                var pd = (DynPropertyDescriptor)context.PropertyDescriptor;
-                eea = (ExpandEnumAttribute)pd.Attributes.Get(typeof(ExpandEnumAttribute), true);
-            }
-            else
-            {
-                eea = (ExpandEnumAttribute)Scm.TypeDescriptor.GetAttributes(EnumType).Get(typeof(ExpandableIEnumerationConverter), true);
-            }
-
-            return eea != null && eea.Exapand;
-        }
-
-        public override Scm.PropertyDescriptorCollection GetProperties(Scm.ITypeDescriptorContext context, object value, Attribute[] attributes)
-        {
-            if (context.PropertyDescriptor == null) { return null; }
-
-            Scm.DefaultValueAttribute dva = context.PropertyDescriptor.Attributes.Get(typeof(Scm.DefaultValueAttribute)) as Scm.DefaultValueAttribute;
-
-            Scm.PropertyDescriptorCollection pdc = new Scm.PropertyDescriptorCollection(null, false);
-            foreach (DynStandardValue sv in GetAllPossibleValues(context))
-            {
-                if (!sv.Visible) continue;
-
-                UpdateStringFromResource(context, sv);
-                var epd = new EnumChildPropertyDescriptor(context, sv.Value.ToString(), sv.Value);
-                epd.Attributes.Add(new Scm.ReadOnlyAttribute(!sv.Enabled), true);
-                epd.Attributes.Add(new Scm.DescriptionAttribute(sv.Description), true);
-                epd.Attributes.Add(new Scm.DisplayNameAttribute(sv.DisplayName), true);
-                epd.Attributes.Add(new Scm.BrowsableAttribute(sv.Visible), true);
-
-                // setup the default value;
-                if (dva != null)
-                {
-                    bool bHasBit = EnumUtil.IsBitsOn(dva.Value, sv.Value);
-                    epd.DefaultValue = bHasBit;
-                }
-                pdc.Add(epd);
-            }
-            return pdc;
-        }
-
-        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, DynStandardValue sv)
-        {
-            ResourceAttribute ra = null;
-
-            if (context != null && context.PropertyDescriptor != null)
-            {
-                ra = (ResourceAttribute)context.PropertyDescriptor.Attributes.Get(typeof(ResourceAttribute));
-            }
-            if (ra == null)
-            {
-                ra = (ResourceAttribute)Scm.TypeDescriptor.GetAttributes(EnumType).Get(typeof(ResourceAttribute));
-            }
-
-            if (ra == null)
-            {
-                return;
-            }
-
-            ResourceManager rm;
-
-            // construct the resource manager using the resInfo
-            try
-            {
-                if (String.IsNullOrEmpty(ra.BaseName) == false && String.IsNullOrEmpty(ra.AssemblyFullName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, Assembly.ReflectionOnlyLoad(ra.AssemblyFullName));
-                }
-                else if (String.IsNullOrEmpty(ra.BaseName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, EnumType.Assembly);
-                }
-                else if (String.IsNullOrEmpty(ra.BaseName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, EnumType.Assembly);
-                }
-                else
-                {
-                    rm = new ResourceManager(EnumType);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                return;
-            }
-
-            // update the display and description string from resource using the resource manager
-
-            string keyName = ra.KeyPrefix + sv.Value + "_Name";  // display name
-            string keyDesc = ra.KeyPrefix + sv.Value + "_Desc"; // description
-            string dispName = String.Empty;
-            string description = String.Empty;
-            try
-            {
-                dispName = rm.GetString(keyName);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            if (String.IsNullOrEmpty(dispName) == false)
-            {
-                sv.DisplayName = dispName;
-            }
-
-            try
-            {
-                description = rm.GetString(keyDesc);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            if (String.IsNullOrEmpty(description) == false)
-            {
-                sv.Description = description;
-            }
-        }
-    }
-
-    internal class PropertySorter : IComparer
-    {
-        #region IComparer<PropertyDescriptor> Members
-
         public int Compare(object x, object y)
         {
             DynPropertyDescriptor xCpd = x as DynPropertyDescriptor;
@@ -952,8 +563,6 @@ namespace LittleReviewer.DynamicType
             }
             return nCompResult;
         }
-
-        #endregion IComparer<PropertyDescriptor> Members
 
         private int CompareProperty(DynPropertyDescriptor xCpd, DynPropertyDescriptor yCpd)
         {
@@ -1264,24 +873,6 @@ namespace LittleReviewer.DynamicType
             }
         }
 
-        private Scm.ISite m_site;
-
-        public Scm.ISite GetSite()
-        {
-            if (m_site != null) return m_site;
-            var site = new SimpleSite();
-            IPropertyValueUIService service = new PropertyValueUIService();
-            service.AddPropertyValueUIHandler(GenericPropertyValueUIHandler);
-            site.AddService(service);
-            m_site = site;
-            return m_site;
-        }
-
-        private void GenericPropertyValueUIHandler(Scm.ITypeDescriptorContext context, Scm.PropertyDescriptor propDesc, ArrayList itemList)
-        {
-            if (propDesc is DynPropertyDescriptor pd && pd.StateItems is ICollection) itemList.AddRange((ICollection)pd.StateItems);
-        }
-
         public void ResetProperties()
         {
             m_pdc.Clear();
@@ -1325,82 +916,8 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    public class StructWrapper : Scm.ICustomTypeDescriptor
-    {
-        public StructWrapper() { }
 
-        public StructWrapper(object structObject)
-        {
-            Debug.Assert(structObject != null);
-            Debug.Assert(structObject.GetType().IsValueType);
-            Struct = structObject;
-        }
-
-        [Scm.BrowsableAttribute(false)]
-        public object Struct { get; set; }
-
-        Scm.AttributeCollection Scm.ICustomTypeDescriptor.GetAttributes()
-        {
-            return Scm.TypeDescriptor.GetAttributes(Struct);
-        }
-
-        string Scm.ICustomTypeDescriptor.GetClassName()
-        {
-            return Scm.TypeDescriptor.GetClassName(Struct);
-        }
-
-        string Scm.ICustomTypeDescriptor.GetComponentName()
-        {
-            return Scm.TypeDescriptor.GetComponentName(Struct);
-        }
-
-        Scm.TypeConverter Scm.ICustomTypeDescriptor.GetConverter()
-        {
-            return Scm.TypeDescriptor.GetConverter(Struct);
-        }
-
-        Scm.EventDescriptor Scm.ICustomTypeDescriptor.GetDefaultEvent()
-        {
-            return Scm.TypeDescriptor.GetDefaultEvent(Struct);
-        }
-
-        Scm.PropertyDescriptor Scm.ICustomTypeDescriptor.GetDefaultProperty()
-        {
-            return Scm.TypeDescriptor.GetDefaultProperty(Struct);
-        }
-
-        object Scm.ICustomTypeDescriptor.GetEditor(Type editorBaseType)
-        {
-            return Scm.TypeDescriptor.GetEditor(Struct, editorBaseType);
-        }
-
-        Scm.EventDescriptorCollection Scm.ICustomTypeDescriptor.GetEvents(Attribute[] attributes)
-        {
-            return Scm.TypeDescriptor.GetEvents(Struct, attributes);
-        }
-
-        Scm.EventDescriptorCollection Scm.ICustomTypeDescriptor.GetEvents()
-        {
-            return Scm.TypeDescriptor.GetEvents(Struct);
-        }
-
-        Scm.PropertyDescriptorCollection Scm.ICustomTypeDescriptor.GetProperties(Attribute[] attributes)
-        {
-            return Scm.TypeDescriptor.GetProperties(Struct, attributes);
-        }
-
-        Scm.PropertyDescriptorCollection Scm.ICustomTypeDescriptor.GetProperties()
-        {
-            return Scm.TypeDescriptor.GetProperties(Struct);
-        }
-
-        object Scm.ICustomTypeDescriptor.GetPropertyOwner(Scm.PropertyDescriptor pd)
-        {
-            return Struct;
-        }
-    }
-
-    internal class TypeDescriptionProvider : Scm.TypeDescriptionProvider
+    public class TypeDescriptionProvider : Scm.TypeDescriptionProvider
     {
         private readonly Scm.ICustomTypeDescriptor m_ctd;
 
@@ -1646,55 +1163,7 @@ namespace LittleReviewer.DynamicType
         public override IList<DynStandardValue> StandardValues { get { return m_StandardValues.AsReadOnly(); } }
     }
 
-    public class EnumChildPropertyDescriptor : BooleanPropertyDescriptor
-    {
-        private readonly Scm.ITypeDescriptorContext m_context;
-        private readonly object m_enumField;  // represent one of the enum field
-
-        public EnumChildPropertyDescriptor(Scm.ITypeDescriptorContext context, string sName, object enumFieldvalue, params Attribute[] attributes) : base(enumFieldvalue.GetType(), sName, false, attributes)
-        {
-            m_context = context;
-            m_enumField = enumFieldvalue;
-        }
-
-        public override void SetValue(object component, object value)
-        {
-            Debug.Assert(component != null);
-            Debug.Assert(component.GetType() == ComponentType);
-
-            Debug.Assert(value != null);
-            Debug.Assert(value.GetType() == PropertyType);
-
-            if (m_context.PropertyDescriptor == null) return;
-
-            object enumInstance = m_context.PropertyDescriptor.GetValue(m_context.Instance);
-            bool bModified;
-            if ((bool)value)
-            {
-                bModified = EnumUtil.TurnOnBits(ref enumInstance, m_enumField);
-            }
-            else
-            {
-                bModified = EnumUtil.TurnOffBits(ref enumInstance, m_enumField);
-            }
-
-            if (!bModified) return;
-
-            var fi = component.GetType().GetField("value__", BindingFlags.Instance | BindingFlags.Public);
-            if (fi != null) fi.SetValue(component, enumInstance);
-            m_context.PropertyDescriptor.SetValue(m_context.Instance, component);
-        }
-
-        public override object GetValue(object component)
-        {
-            Debug.Assert(component != null);
-            Debug.Assert(component.GetType() == ComponentType);
-
-            return EnumUtil.IsBitsOn(component, m_enumField);
-        }
-    }
-
-    internal class EnumUtil
+    public class EnumUtil
     {
         public static bool IsBitsOn(object enumInstance, object bits)
         {
@@ -2089,11 +1558,6 @@ namespace LittleReviewer.DynamicType
                 var sv = new DynStandardValue(Enum.ToObject(enumType, fi.GetValue(null)));
                 sv.DisplayName = Enum.GetName(enumType, sv.Value); // by default
 
-                if (fi.GetCustomAttributes(typeof(DynDisplayNameAttribute), false) is DynDisplayNameAttribute[] dna && dna.Length > 0)
-                {
-                    sv.DisplayName = dna[0].DisplayName;
-                }
-
                 if (fi.GetCustomAttributes(typeof(Scm.DescriptionAttribute), false) is Scm.DescriptionAttribute[] da && da.Length > 0)
                 {
                     sv.Description = da[0].Description;
@@ -2115,202 +1579,16 @@ namespace LittleReviewer.DynamicType
         }
     }
 
-    [AttributeUsage(AttributeTargets.All)]
-    public class DynDisplayNameAttribute : Scm.DisplayNameAttribute
-    {
-        public DynDisplayNameAttribute() { }
-        public DynDisplayNameAttribute(string displayName) : base(displayName) { }
-    }
-
     [AttributeUsage(AttributeTargets.Property)]
-    public class CategoryResourceKeyAttribute : Attribute
+    internal class CategoryResourceKeyAttribute : Attribute
     {
         public CategoryResourceKeyAttribute() { }
         public CategoryResourceKeyAttribute(string resourceKey) { ResourceKey = resourceKey; }
         public string ResourceKey { get; set; }
     }
 
-    public class BooleanConverter : Scm.BooleanConverter
-    {
-        public override bool CanConvertTo(Scm.ITypeDescriptorContext context, Type destinationType)
-        {
-            return destinationType == typeof(DynStandardValue) || base.CanConvertTo(context, destinationType);
-        }
 
-        public override object ConvertFrom(Scm.ITypeDescriptorContext context, CultureInfo culture, object value)
-        {
-            if (!(value is string)) return base.ConvertFrom(context, culture, value);
-            var sInpuValue = (string)value;
-            sInpuValue = sInpuValue.Trim();
-            foreach (var sv in GetAllPossibleValues(context))
-            {
-                UpdateStringFromResource(context, sv);
-
-                if (string.Compare(sv.Value.ToString(), sInpuValue, StringComparison.OrdinalIgnoreCase) == 0 ||
-                    string.Compare(sv.DisplayName, sInpuValue, StringComparison.OrdinalIgnoreCase) == 0)
-                {
-                    return sv.Value;
-                }
-            }
-            return base.ConvertFrom(context, culture, value);
-        }
-
-        public override object ConvertTo(Scm.ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
-        {
-            if (value is string)
-            {
-                if (destinationType == typeof(string))
-                {
-                    return value;
-                }
-                if (destinationType != typeof(DynStandardValue)) return base.ConvertTo(context, culture, value, destinationType);
-                foreach (var sv in GetAllPossibleValues(context))
-                {
-                    UpdateStringFromResource(context, sv);
-
-                    if (string.Compare(value.ToString(), sv.DisplayName, true, culture) == 0 ||
-                        string.Compare(value.ToString(), sv.Value.ToString(), true, culture) == 0)
-                    {
-                        return sv;
-                    }
-                }
-            }
-            else if (value is bool)
-            {
-                if (destinationType == typeof(string))
-                {
-                    foreach (var sv in GetAllPossibleValues(context))
-                    {
-                        if (!sv.Value.Equals(value)) continue;
-                        UpdateStringFromResource(context, sv);
-
-                        return sv.DisplayName;
-                    }
-                }
-                else if (destinationType == typeof(DynStandardValue))
-                {
-                    foreach (var sv in GetAllPossibleValues(context))
-                    {
-                        if (!sv.Value.Equals(value)) continue;
-                        UpdateStringFromResource(context, sv);
-
-                        return sv;
-                    }
-                }
-            }
-            return base.ConvertTo(context, culture, value, destinationType);
-        }
-
-        public override bool GetStandardValuesExclusive(Scm.ITypeDescriptorContext context)
-        {
-            if (context != null && context.PropertyDescriptor != null)
-            {
-                ExclusiveStandardValuesAttribute psfa = (ExclusiveStandardValuesAttribute)context.PropertyDescriptor.Attributes.Get(typeof(ExclusiveStandardValuesAttribute), true);
-                if (psfa != null)
-                {
-                    return psfa.Exclusive;
-                }
-            }
-            return base.GetStandardValuesExclusive(context);
-        }
-
-        private DynStandardValue[] GetAllPossibleValues(Scm.ITypeDescriptorContext context)
-        {
-            var list = new List<DynStandardValue>();
-            if (context != null && context.PropertyDescriptor != null && context.PropertyDescriptor is DynPropertyDescriptor)
-            {
-                var pd = (DynPropertyDescriptor) context.PropertyDescriptor;
-                list.AddRange(pd.StandardValues);
-            }
-            else
-            {
-                list.Add(new DynStandardValue(true));
-                list.Add(new DynStandardValue(false));
-            }
-            return list.ToArray();
-        }
-
-        private void UpdateStringFromResource(Scm.ITypeDescriptorContext context, DynStandardValue sv)
-        {
-            ResourceAttribute ra = null;
-
-            if (context != null && context.PropertyDescriptor != null)
-            {
-                ra = (ResourceAttribute)context.PropertyDescriptor.Attributes.Get(typeof(ResourceAttribute));
-            }
-            if (ra == null)
-            {
-                ra = (ResourceAttribute)Scm.TypeDescriptor.GetAttributes(typeof(bool)).Get(typeof(ResourceAttribute));
-            }
-
-            if (ra == null)
-            {
-                return;
-            }
-
-            ResourceManager rm = null;
-
-            // construct the resource manager using the resInfo
-            try
-            {
-                if (String.IsNullOrEmpty(ra.BaseName) == false && String.IsNullOrEmpty(ra.AssemblyFullName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, Assembly.ReflectionOnlyLoad(ra.AssemblyFullName));
-                }
-                else if (String.IsNullOrEmpty(ra.BaseName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, typeof(bool).Assembly);
-                }
-                else if (String.IsNullOrEmpty(ra.BaseName) == false)
-                {
-                    rm = new ResourceManager(ra.BaseName, typeof(bool).Assembly);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                return;
-            }
-            if (rm == null)
-            {
-                return;
-            }
-
-            // update the display and description string from resource using the resource manager
-
-            string keyName = ra.KeyPrefix + sv.Value + "_Name";  // display name
-            string keyDesc = ra.KeyPrefix + sv.Value + "_Desc"; // description
-            string dispName = string.Empty;
-            string description = string.Empty;
-            try
-            {
-                dispName = rm.GetString(keyName);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            if (string.IsNullOrEmpty(dispName) == false)
-            {
-                sv.DisplayName = dispName;
-            }
-
-            try
-            {
-                description = rm.GetString(keyDesc);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            if (string.IsNullOrEmpty(description) == false)
-            {
-                sv.Description = description;
-            }
-        }
-    }
-
-    public class BooleanPropertyDescriptor : DynPropertyDescriptor
+    internal class BooleanPropertyDescriptor : DynPropertyDescriptor
     {
         public BooleanPropertyDescriptor(Scm.PropertyDescriptor pd) : base(pd)
         {
