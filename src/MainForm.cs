@@ -11,7 +11,6 @@ namespace LittleReviewer
 {
     public partial class MainForm : Form
     {
-        private readonly List<string> AffectedProducts = new List<string>();
         private string BaseDirectory;
         private string CopyReason = "";
 
@@ -135,30 +134,24 @@ namespace LittleReviewer
             SetStatus("IIS started");
         }
 
-        private void CopyMastersAndPR(string folderName)
+        /// <summary>
+        /// Given a dictionary of src=>dst, copy files async
+        /// </summary>
+        private void CopyFiles(Dictionary<string,string> copiesToMake)
         {
-            StopIIS();
-            var prDirectory = Path.Combine(Paths.PullRequestRoot, folderName, Paths.PrContainer);
-            // The PR drop folder is partly set by TFS. It should be configured to follow:
-            //  \\server\share\PullRequests\refs\pull\{ID OF PULL REQUEST}\merge\{FOLDER IN MASTERS TO OVERWRITE}\...contents...
+            if (copiesToMake == null || copiesToMake.Count < 1) {
+                SetStatus("Nothing to synchronise");
+                return;
+            }
 
-            AffectedProducts.Clear();
-            var toCopy = NativeIO.EnumerateFiles(prDirectory, ResultType.DirectoriesOnly).ToList();
+            StopIIS(); // IIS is restarted in `ProgressTimer_Tick` when all copies have completed
 
-            AsyncFile.Copy(Paths.MastersRoot, BaseDirectory, () => {
-                foreach (var fileDetail in toCopy)
-                {
-                    var target = Path.Combine(BaseDirectory, fileDetail.Name);
-                    AsyncFile.Copy(fileDetail.FullName, target, null);
-                    AffectedProducts.Add(fileDetail.Name);
-                }
-            });
-        }
+            // TODO: check for an 'Archive.7z' file and copy that instead of files if possible
 
-        private void CopyMastersToLocal()
-        {
-            StopIIS();
-            AsyncFile.Copy(Paths.MastersRoot, BaseDirectory, null);
+            foreach (var kvp in copiesToMake)
+            {
+                AsyncFile.Copy(kvp.Key, kvp.Value);
+            }
         }
 
         private void SetStatus(string msg)
@@ -186,13 +179,15 @@ namespace LittleReviewer
             foreach (var journey in masters)
             {
                 options.Add(journey, "master");
+                options.Add(journey, "(ignore)");
             }
 
             // Render to list
             var props = DynamicPropertyObject.NewObject();
             foreach (var journey in options.Keys()) {
                 props.AddProperty(key: journey, displayName: journey, description: BuildFileDateDescription(journey),
-                    initialValue: "this should have the recorded last state, or blank", standardValues: options.Get(journey));
+                    initialValue: "master", standardValues: options.Get(journey));
+                // TODO: initialValue should have the recorded last state, or blank
             }
 
 
@@ -208,8 +203,10 @@ namespace LittleReviewer
             var local = GetApproximateLocalTime(journey);
             var remote = GetApproximateMasterTime(journey);
 
+            var age = (local > remote) ? ("  (newer)") : ("  (older)");
+
             if (local == null) sb.Append("Local version is empty");
-            else sb.Append("Local version updated      " + local.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+            else sb.Append("Local version updated      " + local.Value.ToString("yyyy-MM-dd HH:mm:ss") + age);
 
             sb.Append("\r\n");
             
@@ -272,39 +269,57 @@ namespace LittleReviewer
 
         private void StartReviewButton_Click(object sender, EventArgs e)
         {
-            /*if (BranchSelectMenu.SelectedIndex < 1)
+            DisableControls();
+            var props = ((PropertyTarget)JourneyStatusGrid.SelectedObject);
+            var journeys = props.ListProperties();
+
+            // The PR drop folder is partly set by TFS. It should be configured to follow:
+            //  \\server\share\PullRequests\refs\pull\{ID OF PULL REQUEST}\merge\{FOLDER IN MASTERS TO OVERWRITE}\...contents...
+
+            var copies = new Dictionary<string,string>(); // Remote path => Local path
+            foreach (var journey in journeys)
             {
-                SetStatus("Pick a pull request to review");
-                return;
+                var value = props[journey].ToString().ToLowerInvariant();
+                var targetDir = Path.Combine(BaseDirectory, journey);
+
+                if (value == "master") {
+                    var sourceDir = Path.Combine(Paths.MastersRoot, journey);
+                    copies.Add(sourceDir, targetDir);
+                } else if (value == "(ignore)" || string.IsNullOrWhiteSpace(value)) {
+                    // do nothing
+                } else {
+                    var sourceDir = Path.Combine(Paths.PullRequestRoot, value, Paths.PrContainer, journey);
+                    copies.Add(sourceDir, targetDir);
+                }
             }
 
-            DisableControls();
-            SetStatus("Working...");
-            CopyReason = "Updating masters and copying Pull Request";
-            CopyMastersAndPR(BranchSelectMenu.Text);*/
-            // TODO: This needs to be re-worked. Sync all selected journeys
+            CopyReason = "Synchronising";
+            CopyFiles(copies);
         }
 
         private void MainForm_Load(object sender, EventArgs e) { }
         
+        private static readonly object ProgressLock = new object();
         private void ProgressTimer_Tick(object sender, EventArgs e)
         {
-            if (AsyncFile.FilesQueued < 1)
+            lock (ProgressLock)
             {
-                if (AsyncFile.FilesCopied > 0)
+                if (AsyncFile.JobsWaiting < 1)
                 {
-                    var list = string.Join("\r\n", AffectedProducts);
-                    SetStatus("Copy complete\r\n"+list);
-                    AsyncFile.ResetCounts();
-                    StartIIS();
-                    State_ReadyToReview();
+                    if (AsyncFile.FilesCopied > 0)
+                    {
+                        SetStatus("Copy complete");
+                        AsyncFile.ResetCounts();
+                        StartIIS();
+                        SetupProject(BaseDirectory);
+                    }
+                    CopyProgress.Value = 0;
+                    return;
                 }
-                CopyProgress.Value = 0;
-                return;
-            }
 
-            CopyProgress.Value = Math.Min(100,(int)((AsyncFile.FilesCopied / (double) AsyncFile.FilesQueued) * 100));
-            SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
+                CopyProgress.Value = Math.Min(100, (int)((AsyncFile.FilesCopied / (double)AsyncFile.FilesQueued) * 100));
+                SetStatus(CopyReason + ": " + AsyncFile.FilesCopied + " of " + AsyncFile.FilesQueued);
+            }
         }
 
         private void SettingButton_Click(object sender, EventArgs e)
@@ -319,6 +334,7 @@ namespace LittleReviewer
 
         private void RefreshListButton_Click(object sender, EventArgs e)
         {
+            DisableControls();
             SetupProject(BaseDirectory);
         }
     }

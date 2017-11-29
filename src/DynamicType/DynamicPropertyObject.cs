@@ -47,7 +47,7 @@ namespace LittleReviewer.DynamicType
     }
 
     /// <summary>
-    /// Placeholder interface for the proxy object which can store and return property values
+    /// Proxy object which can store and return property values
     /// </summary>
     public class PropertyTarget
     {
@@ -61,6 +61,20 @@ namespace LittleReviewer.DynamicType
                 var td = DynTypeDescriptor.GetTypeDescriptor(this);
                 return td.GetProperties().Find(key,true)?.GetValue(this);
             }
+        }
+
+        /// <summary>
+        /// Provide a list of added `key` names
+        /// </summary>
+        public IEnumerable<string> ListProperties(){
+            var td = DynTypeDescriptor.GetTypeDescriptor(this);
+            var properties = td.GetProperties();
+            var list = new List<string>();
+            for (int i = 0; i < properties.Count; i++)
+            {
+                list.Add(properties[i].Name);
+            }
+            return list;
         }
     }
 }

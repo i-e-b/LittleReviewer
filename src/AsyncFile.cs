@@ -15,8 +15,13 @@ namespace LittleReviewer
             get { return sent; }
         }
 
-        private static volatile int ready;
-        private static volatile int sent;
+        public static int JobsWaiting {
+            get { return jobs; }
+        }
+
+        private static int ready;
+        private static int sent;
+        private static int jobs;
 
         public static void ResetCounts()
         {
@@ -24,7 +29,7 @@ namespace LittleReviewer
             sent = 0;
         }
 
-        public static void Copy(string source, string dest, Action done)
+        public static void Copy(string source, string dest)
         {
             /*
                - Flag for when scanning is done
@@ -40,12 +45,13 @@ namespace LittleReviewer
 
             new Thread(() => // read files
             {
+                Interlocked.Increment(ref jobs);
                 var list = NativeIO.EnumerateFiles(source, ResultType.FilesOnly, "*", SearchOption.AllDirectories);
                 foreach (var file in list)
                     lock (_lock)
                     {
                         fileSubpaths.Enqueue(file);
-                        ready++;
+                        Interlocked.Increment(ref ready);
                     }
                 enumComplete = true;
             }).Start();
@@ -71,10 +77,9 @@ namespace LittleReviewer
                     var target = file.PathInfo.Reroot(source, dest);
                     NativeIO.CreateDirectory(target.Parent, true);
                     NativeIO.CopyFile(file.PathInfo, target, true);
-                    sent++;
+                    Interlocked.Increment(ref sent);
                 }
-                if (done == null) ready = 0;
-                else done();
+                Interlocked.Decrement(ref jobs);
             }).Start();
         }
     }

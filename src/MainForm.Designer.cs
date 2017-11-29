@@ -47,7 +47,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.StatusLabel.Location = new System.Drawing.Point(13, 38);
             this.StatusLabel.Name = "StatusLabel";
-            this.StatusLabel.Size = new System.Drawing.Size(613, 52);
+            this.StatusLabel.Size = new System.Drawing.Size(577, 52);
             this.StatusLabel.TabIndex = 0;
             this.StatusLabel.Text = "Checking shared folders...";
             // 
@@ -72,7 +72,7 @@
             // 
             this.StartReviewButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.StartReviewButton.Enabled = false;
-            this.StartReviewButton.Location = new System.Drawing.Point(454, 390);
+            this.StartReviewButton.Location = new System.Drawing.Point(490, 391);
             this.StartReviewButton.Name = "StartReviewButton";
             this.StartReviewButton.Size = new System.Drawing.Size(136, 23);
             this.StartReviewButton.TabIndex = 3;
@@ -123,9 +123,9 @@
             // 
             // ShowHelpButton
             // 
-            this.ShowHelpButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.ShowHelpButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.ShowHelpButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ShowHelpButton.Location = new System.Drawing.Point(596, 390);
+            this.ShowHelpButton.Location = new System.Drawing.Point(596, 41);
             this.ShowHelpButton.Name = "ShowHelpButton";
             this.ShowHelpButton.Size = new System.Drawing.Size(30, 23);
             this.ShowHelpButton.TabIndex = 9;
@@ -135,7 +135,7 @@
             // 
             // RefreshListButton
             // 
-            this.RefreshListButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.RefreshListButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.RefreshListButton.Enabled = false;
             this.RefreshListButton.Location = new System.Drawing.Point(490, 93);
             this.RefreshListButton.Name = "RefreshListButton";
