@@ -15,9 +15,10 @@ No commits or pushes are made by this tool.
 - [ ] Check out multiple projects' pull requests at once
 - [ ] Download and extract `Masters.7z` instead of folder contents if it exists
 - [ ] More robust error handling & reporting
-- [ ] Assume C/CodeReview if it exists
+- [x] Assume C/CodeReview if it exists
 - [x] Show last updated date remote and local
+- [x] Direct refresh
 - [ ] Allow no-action?
 - [ ] Write a 'last source' file in local directories to show current status
-- [ ] Remove 'Cleanup Review'
+- [x] Remove 'Cleanup Review'
 - [ ] Help screen

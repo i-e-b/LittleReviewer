@@ -1251,7 +1251,7 @@ namespace LittleReviewer
                 // Take care of invalid handles
                 if (fileHandle.IsInvalid && EnumerationHandleInvalidFileHandle(uncDirectoryPath, enumerateOptions, win32Error))
                 {
-                    yield return null;
+                    yield break;
                 }
 
                 // evaluate results

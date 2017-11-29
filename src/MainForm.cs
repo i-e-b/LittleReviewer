@@ -28,6 +28,8 @@ namespace LittleReviewer
                 State_CantFindShare();
             }
 
+            TryFindCodeReviewsFolder();
+
             /*
             // Test stuff:
             //JourneyStatusGrid.SelectedObject = new PropertyObject { Car = DdTest.Four, Home = "Is where the heart is"};
@@ -45,6 +47,18 @@ namespace LittleReviewer
             MessageBox.Show("Current value: "+currentValue);
             // end test
             */
+        }
+
+        /// <summary>
+        /// If there is a folder at C:\CodeReview..., try to use that and immediately load
+        /// </summary>
+        private void TryFindCodeReviewsFolder()
+        {
+            var reviewFolder = NativeIO.EnumerateFiles("C:\\", ResultType.DirectoriesOnly, "CodeReview*", SearchOption.TopDirectoryOnly, SuppressExceptions.SuppressAllExceptions)
+                .FirstOrDefault();
+
+            if (reviewFolder == null) return; // not set up yet, or non-standard folder
+            SetupProject(reviewFolder.FullName);
         }
 
         /// <summary>
@@ -76,6 +90,7 @@ namespace LittleReviewer
             DisableControls();
             LoadProjectButton.Enabled = true;
             StartReviewButton.Enabled = true;
+            RefreshListButton.Enabled = true;
             SetStatus("Project at " + BaseDirectory +" is ready");
         }
 
@@ -176,11 +191,6 @@ namespace LittleReviewer
             // Render to list
             var props = DynamicPropertyObject.NewObject();
             foreach (var journey in options.Keys()) {
-                var local = GetApproximateLocalTime(journey);
-                var remote = GetApproximateMasterTime(journey);
-
-                
-
                 props.AddProperty(key: journey, displayName: journey, description: BuildFileDateDescription(journey),
                     initialValue: "this should have the recorded last state, or blank", standardValues: options.Get(journey));
             }
@@ -188,13 +198,7 @@ namespace LittleReviewer
 
             JourneyStatusGrid.SelectedObject = props;
             JourneyStatusGrid.Refresh();
-            /*
-            BranchSelectMenu.Items.Clear();
-            BranchSelectMenu.Items.Add(PickPullRequestMessage);
-            // ReSharper disable once CoVariantArrayConversion
-            BranchSelectMenu.Items.AddRange(branchesAvailable.ToArray());
-            BranchSelectMenu.SelectedIndex = 0;
-            */
+
             // TODO: This whole thing has to change. Read each PR's journey and add it to that journey's drop downs
         }
 
@@ -205,12 +209,12 @@ namespace LittleReviewer
             var remote = GetApproximateMasterTime(journey);
 
             if (local == null) sb.Append("Local version is empty");
-            else sb.Append("Local version updated " + local.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+            else sb.Append("Local version updated      " + local.Value.ToString("yyyy-MM-dd HH:mm:ss"));
 
             sb.Append("\r\n");
             
             if (remote == null) sb.Append("Remote version is empty");
-            else sb.Append("Remote version updated " + remote.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+            else sb.Append("Remote version updated  " + remote.Value.ToString("yyyy-MM-dd HH:mm:ss"));
 
             return sb.ToString();
         }
@@ -231,15 +235,13 @@ namespace LittleReviewer
         private DateTime? GetFolderMedianTime(string path)
         {
             var allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.TopDirectoryOnly, SuppressExceptions.SuppressAllExceptions)
-                .Select(f=> f.CreationDate)
-                .OrderBy(d=>d)
+                .Select(f=> f.CreationDate).OrderBy(d=>d)
                 .ToArray();
 
             if (allDates.Length < 1) { // no top level files, try a sample of deep files
                 allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.AllDirectories, SuppressExceptions.SuppressAllExceptions)
                     .Take(10)
-                    .Select(f=> f.CreationDate)
-                    .OrderBy(d=>d)
+                    .Select(f=> f.CreationDate).OrderBy(d=>d)
                     .ToArray();
     
                 if (allDates.Length < 1) return null; // no files at all
@@ -253,6 +255,7 @@ namespace LittleReviewer
         {
             LoadProjectButton.Enabled = false;
             StartReviewButton.Enabled = false;
+            RefreshListButton.Enabled = false;
         }
 
         private void LoadProjectButton_Click(object sender, EventArgs e)
@@ -312,6 +315,11 @@ namespace LittleReviewer
         private void HelpButton_Click(object sender, EventArgs e)
         {
             MessageBox.Show("Help");
+        }
+
+        private void RefreshListButton_Click(object sender, EventArgs e)
+        {
+            SetupProject(BaseDirectory);
         }
     }
 }
