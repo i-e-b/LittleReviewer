@@ -13,6 +13,7 @@ namespace LittleReviewer
     {
         private string BaseDirectory;
         private string CopyReason = "";
+        private const char RecordSeparator = '\x1E';
 
         public MainForm()
         {
@@ -183,18 +184,67 @@ namespace LittleReviewer
             }
 
             // Render to list
+            var states = ReadLastKnownStates();
             var props = DynamicPropertyObject.NewObject();
             foreach (var journey in options.Keys()) {
+                var currentValue = GetOrDefault(states, journey, "");
+
                 props.AddProperty(key: journey, displayName: journey, description: BuildFileDateDescription(journey),
-                    initialValue: "master", standardValues: options.Get(journey));
+                    initialValue: currentValue, standardValues: options.Get(journey));
                 // TODO: initialValue should have the recorded last state, or blank
             }
 
 
             JourneyStatusGrid.SelectedObject = props;
             JourneyStatusGrid.Refresh();
+        }
 
-            // TODO: This whole thing has to change. Read each PR's journey and add it to that journey's drop downs
+        private string GetOrDefault(Dictionary<string, string> states, string journey, string defaultValue)
+        {
+            if (states == null || ! states.ContainsKey(journey)) return defaultValue;
+            return states[journey];
+        }
+
+        private Dictionary<string, string> ReadLastKnownStates()
+        {
+            try {
+                var lines = File.ReadAllLines(Path.Combine(BaseDirectory, "LastKnownStates.txt"));
+                var states = new Dictionary<string,string>();
+                foreach (var line in lines)
+                {
+                    var bits = line.Split(RecordSeparator);
+                    if (bits.Length != 2) continue;
+                    states.Add(bits[0], bits[1]);
+                }
+                return states;
+            }
+            catch {
+                return new Dictionary<string, string>();
+            }
+        }
+        
+        /// <summary>
+        /// Feed a dictionary of journey=>state
+        /// </summary>
+        private void WriteNewStates(Dictionary<string,string> updates)
+        {
+            var existing = ReadLastKnownStates();
+            foreach (var kvp in updates)
+            {
+                if (existing.ContainsKey(kvp.Key)) existing[kvp.Key] = kvp.Value;
+                else existing.Add(kvp.Key, kvp.Value);
+            }
+            var sb = new StringBuilder();
+            foreach (var kvp in existing)
+            {
+                sb.Append(kvp.Key);
+                sb.Append(RecordSeparator);
+                sb.AppendLine(kvp.Value);
+            }
+            try {
+                File.WriteAllText(Path.Combine(BaseDirectory, "LastKnownStates.txt"), sb.ToString());
+            }
+            catch { }
         }
 
         private string BuildFileDateDescription(string journey)
@@ -277,6 +327,7 @@ namespace LittleReviewer
             //  \\server\share\PullRequests\refs\pull\{ID OF PULL REQUEST}\merge\{FOLDER IN MASTERS TO OVERWRITE}\...contents...
 
             var copies = new Dictionary<string,string>(); // Remote path => Local path
+            var updates = new Dictionary<string,string>(); // journey => state
             foreach (var journey in journeys)
             {
                 var value = props[journey].ToString().ToLowerInvariant();
@@ -285,16 +336,19 @@ namespace LittleReviewer
                 if (value == "master") {
                     var sourceDir = Path.Combine(Paths.MastersRoot, journey);
                     copies.Add(sourceDir, targetDir);
+                    updates.Add(journey, value);
                 } else if (value == "(ignore)" || string.IsNullOrWhiteSpace(value)) {
                     // do nothing
                 } else {
                     var sourceDir = Path.Combine(Paths.PullRequestRoot, value, Paths.PrContainer, journey);
                     copies.Add(sourceDir, targetDir);
+                    updates.Add(journey, value);
                 }
             }
 
             CopyReason = "Synchronising";
             CopyFiles(copies);
+            WriteNewStates(updates);
         }
 
         private void MainForm_Load(object sender, EventArgs e) { }

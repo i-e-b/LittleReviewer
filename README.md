@@ -19,6 +19,6 @@ This tool reads, presents and copies those folders around.
 - [x] Show last updated date remote and local
 - [x] Direct refresh
 - [x] Allow no-action?
-- [ ] Write a 'last source' file in local directories to show current status
+- [x] Write a 'last source' file in local directories to show current status
 - [x] Remove 'Cleanup Review'
 - [ ] Help screen
