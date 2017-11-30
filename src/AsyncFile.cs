@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -40,23 +39,22 @@ namespace LittleReviewer
                - Flag for when scanning is done
                - Queue of files to be copied
 
-               - spin up a new thread (a) to recurse over the source. It will add files to the queue then flip the flag when done.
-               - spin up a new thread (b) that will copy the files until both queue is empty and flag is flipped
+               - spin up a new thread 
+                   (a) to recurse over the source. It will add files to the queue then flip the flag when done.
+                   (b) that will copy the files until both queue is empty and flag is flipped
             */
 
-            var _lock = new object();
-            var fileSubpaths = new Queue<FileDetail>();
-            var enumComplete = false;
 
             new Thread(() => // read files
             {
+                var _lock = new object();
+                var fileSubpaths = new Queue<FileDetail>();
                 Interlocked.Increment(ref jobs);
 
                 var sourceInfo = new PathInfo(source);
                 var kind = NativeIO.GetTargetKind(sourceInfo);
                 switch (kind) {
                     case FileOrDirectory.Nothing:
-                        enumComplete = true;
                         break;
 
                     case FileOrDirectory.File:
@@ -64,7 +62,6 @@ namespace LittleReviewer
                         {
                             source = Path.GetDirectoryName(source);
                             fileSubpaths.Enqueue(NativeIO.ReadFileDetails(sourceInfo));
-                            enumComplete = true;
                         }
                         break;
 
@@ -76,16 +73,11 @@ namespace LittleReviewer
                                 fileSubpaths.Enqueue(file);
                                 Interlocked.Increment(ref ready);
                             }
-                        enumComplete = true;
                         break;
                 }
-            }).Start();
 
-            
-            new Thread(() => // write files
-            {
                 bool hasItems = true;
-                while (!enumComplete || hasItems)
+                while (hasItems)
                 {
                     FileDetail file;
                     lock (_lock)
@@ -95,7 +87,6 @@ namespace LittleReviewer
                             hasItems = false;
                             continue;
                         }
-                        hasItems = true;
                         file = fileSubpaths.Dequeue();
                     }
 

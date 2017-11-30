@@ -1,5 +1,5 @@
 # LittleReviewer
-A tiny git front-end for reviewers (not developers)
+A tiny file-copy front-end for reviewers.
 
 This tool is designed to give non-developers a chance to test TFS pull requests before they are merged.
 
@@ -14,7 +14,7 @@ This tool reads, presents and copies those folders around.
 
 - [x] Check out multiple projects' pull requests at once
 - [x] *Allow* download and extract `Archive.7z` instead of folder contents if it exists. Must have switch, as it's much slower when running on a fast network.
-- [ ] More robust error handling & reporting
+- [x] More robust error handling & reporting
 - [x] Assume C/CodeReview if it exists
 - [x] Show last updated date remote and local
 - [x] Direct refresh
@@ -22,7 +22,3 @@ This tool reads, presents and copies those folders around.
 - [x] Write a 'last source' file in local directories to show current status
 - [x] Remove 'Cleanup Review'
 - [x] Help screen
-
-## Bugs?
-
-- Is the copy always working for all selected products?
