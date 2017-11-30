@@ -147,15 +147,12 @@ namespace LittleReviewer
 
             StopIIS(); // IIS is restarted in `ProgressTimer_Tick` when all copies have completed
 
-            // TODO: check for an 'Archive.7z' file and copy that instead of files if possible
-
-            AsyncFile.UnpackArchiveFiles = VpnModeCheckbox.Checked;
+            AsyncFile.UnpackArchiveFiles = VpnModeCheckbox.Checked; // if true, Async file will try to unpack anything called 'Archive.7z'
 
             foreach (var kvp in copiesToMake)
             {
                 if (VpnModeCheckbox.Checked && NativeIO.Exists(new PathInfo(Path.Combine(kvp.Key, "Archive.7z")))) {
                     // copy just the archive, then expand as a post-process.
-                    // TODO: write the post-process
                     AsyncFile.Copy(Path.Combine(kvp.Key, "Archive.7z"), kvp.Value);
                 } else {
                     AsyncFile.Copy(kvp.Key, kvp.Value);
@@ -199,7 +196,6 @@ namespace LittleReviewer
 
                 props.AddProperty(key: journey, displayName: journey, description: BuildFileDateDescription(journey),
                     initialValue: currentValue, standardValues: options.Get(journey));
-                // TODO: initialValue should have the recorded last state, or blank
             }
 
 
@@ -252,8 +248,9 @@ namespace LittleReviewer
             try {
                 File.WriteAllText(Path.Combine(BaseDirectory, "LastKnownStates.txt"), sb.ToString());
             }
-            catch { }
+            catch { Ignore(); }
         }
+
 
         private string BuildFileDateDescription(string journey)
         {
@@ -261,10 +258,8 @@ namespace LittleReviewer
             var local = GetApproximateLocalTime(journey);
             var remote = GetApproximateMasterTime(journey);
 
-            var age = (local > remote) ? ("  (newer)") : ("  (older)");
-
             if (local == null) sb.Append("Local version is empty");
-            else sb.Append("Local version updated      " + local.Value.ToString("yyyy-MM-dd HH:mm:ss") + age);
+            else sb.Append("Local version updated      " + local.Value.ToString("yyyy-MM-dd HH:mm:ss"));
 
             sb.Append("\r\n");
             
@@ -394,7 +389,7 @@ namespace LittleReviewer
 
         private void HelpButton_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Help");
+            new HelpScreen().Show();
         }
 
         private void RefreshListButton_Click(object sender, EventArgs e)
@@ -402,5 +397,7 @@ namespace LittleReviewer
             DisableControls();
             SetupProject(BaseDirectory);
         }
+
+        private void Ignore() { }
     }
 }

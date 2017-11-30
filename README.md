@@ -21,4 +21,8 @@ This tool reads, presents and copies those folders around.
 - [x] Allow no-action?
 - [x] Write a 'last source' file in local directories to show current status
 - [x] Remove 'Cleanup Review'
-- [ ] Help screen
+- [x] Help screen
+
+## Bugs?
+
+- Is the copy always working for all selected products?
