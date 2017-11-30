@@ -285,13 +285,13 @@ namespace LittleReviewer
         private DateTime? GetFolderMedianTime(string path)
         {
             var allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.TopDirectoryOnly, SuppressExceptions.SuppressAllExceptions)
-                .Select(f=> f.CreationDate).OrderBy(d=>d)
+                .Select(f=> f.ModifiedDate).OrderBy(d=>d)
                 .ToArray();
 
             if (allDates.Length < 1) { // no top level files, try a sample of deep files
                 allDates = NativeIO.EnumerateFiles(path, ResultType.FilesOnly, "*", SearchOption.AllDirectories, SuppressExceptions.SuppressAllExceptions)
                     .Take(10)
-                    .Select(f=> f.CreationDate).OrderBy(d=>d)
+                    .Select(f=> f.ModifiedDate).OrderBy(d=>d)
                     .ToArray();
     
                 if (allDates.Length < 1) return null; // no files at all

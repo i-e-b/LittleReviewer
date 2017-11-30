@@ -990,11 +990,10 @@ namespace LittleReviewer
         /// </summary>
         private void CalculateTimes(Win32FindData data)
         {
-            long fileTime = (((long)data.ftCreationTime_dwHighDateTime) << 32) + ((long)data.ftCreationTime_dwLowDateTime);
-            CreationDate = DateTime.FromFileTime(fileTime);
+            ModifiedDate = data.GetLastWriteTimeUtc().ToLocalTime();
         }
 
-        public DateTime CreationDate { get; set; }
+        public DateTime ModifiedDate { get; set; }
 
         /// <summary>
         /// PathInfo Container
