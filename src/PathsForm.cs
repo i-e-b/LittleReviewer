@@ -17,5 +17,10 @@ namespace LittleReviewer
             Paths.MastersRoot = MastersRootTextBox.Text;
             Close();
         }
+
+        private void CancelButton_Click(object sender, System.EventArgs e)
+        {
+            Close();
+        }
     }
 }

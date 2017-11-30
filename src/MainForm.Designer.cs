@@ -55,10 +55,11 @@
             // LoadProjectButton
             // 
             this.LoadProjectButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.LoadProjectButton.ForeColor = System.Drawing.SystemColors.ControlDarkDark;
             this.LoadProjectButton.Location = new System.Drawing.Point(16, 390);
             this.LoadProjectButton.Name = "LoadProjectButton";
             this.LoadProjectButton.Size = new System.Drawing.Size(184, 23);
-            this.LoadProjectButton.TabIndex = 1;
+            this.LoadProjectButton.TabIndex = 4;
             this.LoadProjectButton.Text = "Select Local Review Folder...";
             this.LoadProjectButton.UseVisualStyleBackColor = true;
             this.LoadProjectButton.Click += new System.EventHandler(this.LoadProjectButton_Click);
@@ -76,7 +77,7 @@
             this.StartReviewButton.Location = new System.Drawing.Point(490, 391);
             this.StartReviewButton.Name = "StartReviewButton";
             this.StartReviewButton.Size = new System.Drawing.Size(136, 23);
-            this.StartReviewButton.TabIndex = 3;
+            this.StartReviewButton.TabIndex = 0;
             this.StartReviewButton.Text = "Synchronise";
             this.StartReviewButton.UseVisualStyleBackColor = true;
             this.StartReviewButton.Click += new System.EventHandler(this.StartReviewButton_Click);
@@ -119,7 +120,7 @@
             this.JourneyStatusGrid.Name = "JourneyStatusGrid";
             this.JourneyStatusGrid.PropertySort = System.Windows.Forms.PropertySort.Alphabetical;
             this.JourneyStatusGrid.Size = new System.Drawing.Size(615, 263);
-            this.JourneyStatusGrid.TabIndex = 8;
+            this.JourneyStatusGrid.TabIndex = 3;
             this.JourneyStatusGrid.ToolbarVisible = false;
             // 
             // ShowHelpButton
@@ -141,7 +142,7 @@
             this.RefreshListButton.Location = new System.Drawing.Point(490, 93);
             this.RefreshListButton.Name = "RefreshListButton";
             this.RefreshListButton.Size = new System.Drawing.Size(136, 23);
-            this.RefreshListButton.TabIndex = 10;
+            this.RefreshListButton.TabIndex = 1;
             this.RefreshListButton.Text = "Refresh List";
             this.RefreshListButton.UseVisualStyleBackColor = true;
             this.RefreshListButton.Click += new System.EventHandler(this.RefreshListButton_Click);
@@ -152,7 +153,7 @@
             this.VpnModeCheckbox.Location = new System.Drawing.Point(16, 93);
             this.VpnModeCheckbox.Name = "VpnModeCheckbox";
             this.VpnModeCheckbox.Size = new System.Drawing.Size(155, 17);
-            this.VpnModeCheckbox.TabIndex = 11;
+            this.VpnModeCheckbox.TabIndex = 2;
             this.VpnModeCheckbox.Text = "Slow Network / VPN Mode";
             this.VpnModeCheckbox.UseVisualStyleBackColor = true;
             // 

@@ -34,6 +34,7 @@
             this.MastersRootTextBox = new System.Windows.Forms.TextBox();
             this.label3 = new System.Windows.Forms.Label();
             this.SaveButton = new System.Windows.Forms.Button();
+            this.CancelButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // PullRequestRootTextBox
@@ -95,12 +96,24 @@
             this.SaveButton.UseVisualStyleBackColor = true;
             this.SaveButton.Click += new System.EventHandler(this.SaveButton_Click);
             // 
+            // CancelButton
+            // 
+            this.CancelButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.CancelButton.Location = new System.Drawing.Point(372, 149);
+            this.CancelButton.Name = "CancelButton";
+            this.CancelButton.Size = new System.Drawing.Size(75, 23);
+            this.CancelButton.TabIndex = 6;
+            this.CancelButton.Text = "Cancel";
+            this.CancelButton.UseVisualStyleBackColor = true;
+            this.CancelButton.Click += new System.EventHandler(this.CancelButton_Click);
+            // 
             // PathsForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(541, 184);
             this.ControlBox = false;
+            this.Controls.Add(this.CancelButton);
             this.Controls.Add(this.SaveButton);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.label2);
@@ -124,5 +137,6 @@
         private System.Windows.Forms.TextBox MastersRootTextBox;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button SaveButton;
+        private System.Windows.Forms.Button CancelButton;
     }
 }
