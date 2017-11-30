@@ -82,6 +82,7 @@ namespace LittleReviewer
             var prs = NativeIO.EnumerateFiles(Paths.PullRequestRoot, ResultType.DirectoriesOnly).Select(f=>f.Name).ToList();
 
             WriteBranchesToPropertiesGrid(prs);
+            SetStatus("Project at " + BaseDirectory +" is ready");
             State_ReadyToReview();
         }
 
@@ -91,7 +92,6 @@ namespace LittleReviewer
             LoadProjectButton.Enabled = true;
             StartReviewButton.Enabled = true;
             RefreshListButton.Enabled = true;
-            SetStatus("Project at " + BaseDirectory +" is ready");
         }
 
         private void Status_SelectedRoot()
@@ -138,10 +138,11 @@ namespace LittleReviewer
         /// <summary>
         /// Given a dictionary of src=>dst, copy files async
         /// </summary>
-        private void CopyFiles(Dictionary<string,string> copiesToMake)
+        private void CopyFiles(List<StateTransition> copiesToMake)
         {
             if (copiesToMake == null || copiesToMake.Count < 1) {
                 SetStatus("Nothing to synchronise");
+                State_ReadyToReview();
                 return;
             }
 
@@ -149,13 +150,14 @@ namespace LittleReviewer
 
             AsyncFile.UnpackArchiveFiles = VpnModeCheckbox.Checked; // if true, Async file will try to unpack anything called 'Archive.7z'
 
-            foreach (var kvp in copiesToMake)
+            foreach (var change in copiesToMake)
             {
-                if (VpnModeCheckbox.Checked && NativeIO.Exists(new PathInfo(Path.Combine(kvp.Key, "Archive.7z")))) {
+                var displayName = change.JourneyName+"->"+change.RequestedState;
+                if (VpnModeCheckbox.Checked && NativeIO.Exists(new PathInfo(Path.Combine(change.RemotePath, "Archive.7z")))) {
                     // copy just the archive, then expand as a post-process.
-                    AsyncFile.Copy(Path.Combine(kvp.Key, "Archive.7z"), kvp.Value);
+                    AsyncFile.Copy(Path.Combine(change.RemotePath, "Archive.7z"), change.LocalPath, displayName);
                 } else {
-                    AsyncFile.Copy(kvp.Key, kvp.Value);
+                    AsyncFile.Copy(change.RemotePath, change.LocalPath, displayName);
                 }
             }
         }
@@ -230,13 +232,13 @@ namespace LittleReviewer
         /// <summary>
         /// Feed a dictionary of journey=>state
         /// </summary>
-        private void WriteNewStates(Dictionary<string,string> updates)
+        private void WriteNewStates(List<StateTransition> updates)
         {
             var existing = ReadLastKnownStates();
-            foreach (var kvp in updates)
+            foreach (var change in updates)
             {
-                if (existing.ContainsKey(kvp.Key)) existing[kvp.Key] = kvp.Value;
-                else existing.Add(kvp.Key, kvp.Value);
+                if (existing.ContainsKey(change.JourneyName)) existing[change.JourneyName] = change.RequestedState;
+                else existing.Add(change.JourneyName, change.RequestedState);
             }
             var sb = new StringBuilder();
             foreach (var kvp in existing)
@@ -329,8 +331,7 @@ namespace LittleReviewer
             // The PR drop folder is partly set by TFS. It should be configured to follow:
             //  \\server\share\PullRequests\refs\pull\{ID OF PULL REQUEST}\merge\{FOLDER IN MASTERS TO OVERWRITE}\...contents...
 
-            var copies = new Dictionary<string,string>(); // Remote path => Local path
-            var updates = new Dictionary<string,string>(); // journey => state
+            var changes = new List<StateTransition>();
             foreach (var journey in journeys)
             {
                 var value = props[journey].ToString().ToLowerInvariant();
@@ -338,20 +339,28 @@ namespace LittleReviewer
 
                 if (value == "master") {
                     var sourceDir = Path.Combine(Paths.MastersRoot, journey);
-                    copies.Add(sourceDir, targetDir);
-                    updates.Add(journey, value);
+                    changes.Add(new StateTransition{
+                        JourneyName = journey,
+                        LocalPath = targetDir,
+                        RemotePath = sourceDir,
+                        RequestedState = value
+                        });
                 } else if (value == "(ignore)" || string.IsNullOrWhiteSpace(value)) {
                     // do nothing
                 } else {
                     var sourceDir = Path.Combine(Paths.PullRequestRoot, value, Paths.PrContainer, journey);
-                    copies.Add(sourceDir, targetDir);
-                    updates.Add(journey, value);
+                    changes.Add(new StateTransition{
+                        JourneyName = journey,
+                        LocalPath = targetDir,
+                        RemotePath = sourceDir,
+                        RequestedState = value
+                    });
                 }
             }
 
             CopyReason = "Synchronising";
-            CopyFiles(copies);
-            WriteNewStates(updates);
+            CopyFiles(changes);
+            WriteNewStates(changes);
         }
 
         private void MainForm_Load(object sender, EventArgs e) { }
@@ -365,6 +374,15 @@ namespace LittleReviewer
                 {
                     if (AsyncFile.FilesCopied > 0)
                     {
+                        var failed = AsyncFile.FailedSources();
+                        SetStatus("Copy complete");
+                        AsyncFile.ResetCounts();
+
+                        if (failed.Count > 0) {
+                            var list = string.Join("    \r\n", failed);
+                            MessageBox.Show("Some sources no longer exist. Consider changing them to 'master':\r\n"+list);
+                        }
+
                         SetStatus("Copy complete");
                         AsyncFile.ResetCounts();
                         StartIIS();

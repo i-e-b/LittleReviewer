@@ -26,14 +26,23 @@ namespace LittleReviewer
         private static int ready;
         private static int sent;
         private static int jobs;
+        private static readonly List<string> failedSources = new List<string>();
 
         public static void ResetCounts()
         {
             ready = 0;
             sent = 0;
+            failedSources.Clear();
         }
 
-        public static void Copy(string source, string dest)
+        /// <summary>
+        /// Return any sources that could not be found
+        /// </summary>
+        public static ICollection<string> FailedSources(){
+            return failedSources.ToArray();
+        }
+
+        public static void Copy(string source, string dest, string displayName)
         {
             /*
                - Flag for when scanning is done
@@ -55,6 +64,10 @@ namespace LittleReviewer
                 var kind = NativeIO.GetTargetKind(sourceInfo);
                 switch (kind) {
                     case FileOrDirectory.Nothing:
+                        // Nothing found. Increment the counts so we don't freeze up.
+                        Interlocked.Increment(ref sent);
+                        Interlocked.Increment(ref ready);
+                        failedSources.Add(displayName); // store the missing thing
                         break;
 
                     case FileOrDirectory.File:
@@ -66,7 +79,7 @@ namespace LittleReviewer
                         break;
 
                     case FileOrDirectory.Directory:
-                        var list = NativeIO.EnumerateFiles(source, ResultType.FilesOnly, "*", SearchOption.AllDirectories).ToList();
+                        var list = NativeIO.EnumerateFiles(source, ResultType.FilesOnly, "*", SearchOption.AllDirectories);
                         foreach (var file in list)
                             lock (_lock)
                             {
