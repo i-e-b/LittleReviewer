@@ -92,6 +92,7 @@ namespace LittleReviewer
             LoadProjectButton.Enabled = true;
             StartReviewButton.Enabled = true;
             RefreshListButton.Enabled = true;
+            VpnModeCheckbox.Enabled = true;
         }
 
         private void Status_SelectedRoot()
@@ -105,6 +106,14 @@ namespace LittleReviewer
         {
             DisableControls();
             SetStatus("Could not access the build output. Expecting it at '" + Paths.MastersRoot + "'.\r\nPlease check with the dev team.");
+        }
+
+        private void DisableControls()
+        {
+            LoadProjectButton.Enabled = false;
+            StartReviewButton.Enabled = false;
+            RefreshListButton.Enabled = false;
+            VpnModeCheckbox.Enabled = false;
         }
 
         private void StopIIS()
@@ -253,7 +262,6 @@ namespace LittleReviewer
             catch { Ignore(); }
         }
 
-
         private string BuildFileDateDescription(string journey)
         {
             var sb = new StringBuilder();
@@ -301,13 +309,6 @@ namespace LittleReviewer
             var idx = allDates.Length / 2;
 
             return allDates[idx];
-        }
-
-        private void DisableControls()
-        {
-            LoadProjectButton.Enabled = false;
-            StartReviewButton.Enabled = false;
-            RefreshListButton.Enabled = false;
         }
 
         private void LoadProjectButton_Click(object sender, EventArgs e)
